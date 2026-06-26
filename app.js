@@ -11,6 +11,7 @@ let nextRefreshAt = null;
 let heatMap = null;
 let heatLayer = null;
 let heatMarkerLayer = null;
+let heatBoundaryLayer = null;
 let heatBounds = null;
 let heatUserMoved = false;
 const charts = {};
@@ -362,6 +363,26 @@ function ensureHeatMap(center) {
   return heatMap;
 }
 
+
+function geoJsonLatLngsForBounds(geojson) {
+  if (!geojson) return [];
+  const geometry = geojson.type === "Feature" ? geojson.geometry
+    : geojson.type === "FeatureCollection" ? (geojson.features || []).map(f => f.geometry)
+    : geojson;
+  const points = [];
+  const walk = (value) => {
+    if (!value) return;
+    if (Array.isArray(value) && typeof value[0] === "number" && typeof value[1] === "number") {
+      points.push([Number(value[1]), Number(value[0])]);
+      return;
+    }
+    if (Array.isArray(value)) value.forEach(walk);
+    else if (value.coordinates) walk(value.coordinates);
+  };
+  walk(geometry);
+  return points.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+}
+
 function renderHeatMap(data, forceFit = false) {
   const geo = data.geo || {};
   const center = {
@@ -381,9 +402,27 @@ function renderHeatMap(data, forceFit = false) {
     map.removeLayer(heatLayer);
     heatLayer = null;
   }
+  if (heatBoundaryLayer) {
+    map.removeLayer(heatBoundaryLayer);
+    heatBoundaryLayer = null;
+  }
   if (heatMarkerLayer) heatMarkerLayer.clearLayers();
 
   heatBounds = null;
+
+  if (geo.boundary_geojson && window.L.geoJSON) {
+    heatBoundaryLayer = L.geoJSON(geo.boundary_geojson, {
+      style: {
+        color: "#0f172a",
+        weight: 2,
+        opacity: 0.82,
+        fillColor: "#38bdf8",
+        fillOpacity: 0.06,
+        dashArray: "6 6"
+      }
+    }).addTo(map);
+    heatBoundaryLayer.bindPopup(`Límite operacional ${dash(data.control_center?.name || data.control_center?.code)}`);
+  }
 
   if (points.length && mode !== "points" && window.L.heatLayer) {
     const heatPoints = points.map((p) => [p.latitude, p.longitude, Math.max(0.35, Math.min(1, p.weight || 0.65))]);
@@ -424,8 +463,14 @@ function renderHeatMap(data, forceFit = false) {
       map.fitBounds(heatBounds.pad(0.22), { maxZoom: 15, animate: false });
     }
   } else {
-    const fallback = toLatLng(center) || [-33.01895, -71.55090];
-    if (forceFit || !heatUserMoved) map.setView(fallback, 14);
+    const boundaryPoints = geoJsonLatLngsForBounds(geo.boundary_geojson);
+    if (boundaryPoints.length) {
+      heatBounds = L.latLngBounds(boundaryPoints);
+      if (forceFit || !heatUserMoved) map.fitBounds(heatBounds.pad(0.06), { maxZoom: Number(geo.map_zoom || 13), animate: false });
+    } else {
+      const fallback = toLatLng(center) || [-33.01895, -71.55090];
+      if (forceFit || !heatUserMoved) map.setView(fallback, Number(geo.map_zoom || data.control_center?.map_zoom || 14));
+    }
   }
 
   const total = points.length;
@@ -433,7 +478,7 @@ function renderHeatMap(data, forceFit = false) {
   const top = zones[0];
   setText("mapSummary", total
     ? `${fmt(total)} eventos georreferenciados · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}`
-    : "Sin eventos georreferenciados para el período seleccionado."
+    : (geo.boundary_geojson ? "Sin eventos georreferenciados para el período seleccionado. Se muestra el límite operacional comunal." : "Sin eventos georreferenciados para el período seleccionado.")
   );
 
   if ($("hotZonesTable")) {
