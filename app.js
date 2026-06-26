@@ -383,6 +383,66 @@ function geoJsonLatLngsForBounds(geojson) {
   return points.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
 }
 
+
+function normalizeGeoJsonGeometryList(geojson) {
+  if (!geojson) return [];
+  if (geojson.type === "FeatureCollection") return (geojson.features || []).map(f => f.geometry).filter(Boolean);
+  if (geojson.type === "Feature") return geojson.geometry ? [geojson.geometry] : [];
+  return geojson.type ? [geojson] : [];
+}
+
+function pointInRing(lng, lat, ring) {
+  // Ray-casting algorithm. GeoJSON coordinates are [lng, lat].
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = Number(ring[i][0]);
+    const yi = Number(ring[i][1]);
+    const xj = Number(ring[j][0]);
+    const yj = Number(ring[j][1]);
+    const intersects = ((yi > lat) !== (yj > lat)) &&
+      (lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || 1e-12) + xi);
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInPolygonCoordinates(lng, lat, polygonCoords) {
+  if (!Array.isArray(polygonCoords) || !polygonCoords.length) return false;
+  // First ring is shell; subsequent rings are holes.
+  if (!pointInRing(lng, lat, polygonCoords[0])) return false;
+  for (let i = 1; i < polygonCoords.length; i++) {
+    if (pointInRing(lng, lat, polygonCoords[i])) return false;
+  }
+  return true;
+}
+
+function pointInGeoJson(lng, lat, geojson) {
+  const geometries = normalizeGeoJsonGeometryList(geojson);
+  for (const geom of geometries) {
+    if (!geom) continue;
+    if (geom.type === "Polygon" && pointInPolygonCoordinates(lng, lat, geom.coordinates)) return true;
+    if (geom.type === "MultiPolygon" && Array.isArray(geom.coordinates)) {
+      if (geom.coordinates.some(poly => pointInPolygonCoordinates(lng, lat, poly))) return true;
+    }
+  }
+  return false;
+}
+
+function normalizeHeatPoint(p) {
+  const latitude = Number(p?.latitude ?? p?.lat);
+  const longitude = Number(p?.longitude ?? p?.lon ?? p?.lng);
+  const weight = Number(p?.weight || 0.65);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { ...p, latitude, longitude, weight };
+}
+
+function isOperationalHeatPoint(p, boundaryGeoJson) {
+  const jurisdiction = String(p?.jurisdiction_status || p?.jurisdiction?.status || "").toUpperCase();
+  if (jurisdiction === "OUT_OF_JURISDICTION") return false;
+  if (!boundaryGeoJson) return true;
+  return pointInGeoJson(Number(p.longitude), Number(p.latitude), boundaryGeoJson);
+}
+
 function renderHeatMap(data, forceFit = false) {
   const geo = data.geo || {};
   const center = {
@@ -392,9 +452,11 @@ function renderHeatMap(data, forceFit = false) {
   const map = ensureHeatMap(center);
   if (!map) return;
 
-  const points = (geo.event_points || [])
-    .map((p) => ({ ...p, latitude: Number(p.latitude), longitude: Number(p.longitude), weight: Number(p.weight || 0.65) }))
-    .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
+  const allPoints = (geo.event_points || [])
+    .map(normalizeHeatPoint)
+    .filter(Boolean);
+  const points = allPoints.filter((p) => isOperationalHeatPoint(p, geo.boundary_geojson));
+  const outOfJurisdictionCount = allPoints.length - points.length;
   const zones = geo.top_zones || [];
   const mode = getHeatMode();
 
@@ -457,28 +519,34 @@ function renderHeatMap(data, forceFit = false) {
     });
   }
 
-  if (points.length) {
+  const boundaryPoints = geoJsonLatLngsForBounds(geo.boundary_geojson);
+  if (boundaryPoints.length) {
+    // El límite comunal manda sobre los puntos. Esto evita que un evento de prueba
+    // fuera de la comuna aleje el dashboard hasta La Serena, Arica, etc.
+    heatBounds = L.latLngBounds(boundaryPoints);
+    if (forceFit || !heatUserMoved) {
+      map.fitBounds(heatBounds.pad(0.06), {
+        maxZoom: Number(geo.map_zoom || data.control_center?.map_zoom || 13),
+        animate: false
+      });
+    }
+  } else if (points.length) {
     heatBounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
     if (forceFit || !heatUserMoved) {
       map.fitBounds(heatBounds.pad(0.22), { maxZoom: 15, animate: false });
     }
   } else {
-    const boundaryPoints = geoJsonLatLngsForBounds(geo.boundary_geojson);
-    if (boundaryPoints.length) {
-      heatBounds = L.latLngBounds(boundaryPoints);
-      if (forceFit || !heatUserMoved) map.fitBounds(heatBounds.pad(0.06), { maxZoom: Number(geo.map_zoom || 13), animate: false });
-    } else {
-      const fallback = toLatLng(center) || [-33.01895, -71.55090];
-      if (forceFit || !heatUserMoved) map.setView(fallback, Number(geo.map_zoom || data.control_center?.map_zoom || 14));
-    }
+    const fallback = toLatLng(center) || [-33.01895, -71.55090];
+    if (forceFit || !heatUserMoved) map.setView(fallback, Number(geo.map_zoom || data.control_center?.map_zoom || 14));
   }
 
   const total = points.length;
   const open = points.filter((p) => !["CLOSED", "CANCELLED", "RESOLVED"].includes(String(p.state || "").toUpperCase())).length;
   const top = zones[0];
+  const jurisdictionNote = outOfJurisdictionCount > 0 ? ` · ${fmt(outOfJurisdictionCount)} fuera de jurisdicción excluidos` : "";
   setText("mapSummary", total
-    ? `${fmt(total)} eventos georreferenciados · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}`
-    : (geo.boundary_geojson ? "Sin eventos georreferenciados para el período seleccionado. Se muestra el límite operacional comunal." : "Sin eventos georreferenciados para el período seleccionado.")
+    ? `${fmt(total)} eventos georreferenciados dentro de la comuna · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}${jurisdictionNote}`
+    : (geo.boundary_geojson ? `Sin eventos georreferenciados dentro de la comuna para el período seleccionado. Se muestra el límite operacional comunal.${jurisdictionNote}` : "Sin eventos georreferenciados para el período seleccionado.")
   );
 
   if ($("hotZonesTable")) {
