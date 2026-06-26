@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>SOS Municipal · Dashboard Ejecutivo</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="loginView" class="login-wrap">
+    <section class="login-card">
+      <div class="brand-row">
+        <div class="brand-mark">SOS</div>
+        <div>
+          <div class="eyebrow">Sistema SOS Municipal</div>
+          <h1>Dashboard Ejecutivo</h1>
+        </div>
+      </div>
+      <p class="lead">Indicadores operacionales, validación ciudadana, desempeño de resolutores, dispositivos y sirenas.</p>
+      <label class="field-label" for="loginPhone">Teléfono operador o administrador</label>
+      <input id="loginPhone" class="input" inputmode="tel" placeholder="+569XXXXXXXX" autocomplete="tel" />
+      <button id="loginBtn" class="btn primary full">Entrar al Dashboard</button>
+      <p id="loginMessage" class="message"></p>
+      <p class="hint">Acceso permitido para usuarios <strong>OPERATOR</strong> o <strong>ADMIN</strong>.</p>
+    </section>
+  </div>
+
+  <main id="appView" class="app hidden">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Dashboard Ejecutivo</div>
+        <h1>Sistema SOS Municipal</h1>
+        <p id="subtitle" class="subtitle">Cargando indicadores...</p>
+      </div>
+      <div class="top-actions">
+        <select id="periodSelect" class="select" title="Período">
+          <option value="7">Últimos 7 días</option>
+          <option value="30" selected>Últimos 30 días</option>
+          <option value="90">Últimos 90 días</option>
+          <option value="365">Últimos 12 meses</option>
+        </select>
+        <input id="ccInput" class="cc-input" value="CC-VINA" title="Centro de control" />
+        <button id="refreshBtn" class="btn secondary">Actualizar</button>
+        <button id="exportBtn" class="btn secondary">Exportar CSV</button>
+        <button id="printBtn" class="btn secondary">Imprimir</button>
+        <button id="logoutBtn" class="btn ghost">Salir</button>
+      </div>
+    </header>
+
+    <section class="status-strip">
+      <div><span class="dot ok"></span><strong id="userLabel">Sesión</strong></div>
+      <div id="updatedAt">Actualizado: —</div>
+      <div id="periodLabel">Período: —</div>
+    </section>
+
+    <section class="hero-grid">
+      <article class="hero-card dark">
+        <div class="card-label">Tickets período</div>
+        <div id="kpiTicketsPeriod" class="hero-number">—</div>
+        <div class="hero-foot"><span id="kpiTicketsAll">—</span> históricos</div>
+      </article>
+      <article class="hero-card alert">
+        <div class="card-label">Tickets abiertos</div>
+        <div id="kpiOpen" class="hero-number">—</div>
+        <div class="hero-foot">Más antiguo: <span id="kpiOldestOpen">—</span></div>
+      </article>
+      <article class="hero-card">
+        <div class="card-label">Resolución promedio</div>
+        <div id="kpiResolveAvg" class="hero-number">—</div>
+        <div class="hero-foot">SLA 60 min: <span id="kpiSlaResolve">—</span></div>
+      </article>
+      <article class="hero-card">
+        <div class="card-label">Resolutores disponibles</div>
+        <div id="kpiResolversAvailable" class="hero-number">—</div>
+        <div class="hero-foot"><span id="kpiResolversOnline">—</span> online</div>
+      </article>
+    </section>
+
+    <section class="kpi-grid">
+      <article class="kpi"><span>Últimas 24h</span><strong id="kpi24h">—</strong></article>
+      <article class="kpi"><span>Alta prioridad</span><strong id="kpiPriority">—</strong></article>
+      <article class="kpi"><span>Vecinos validados</span><strong id="kpiNeighborsValidated">—</strong></article>
+      <article class="kpi"><span>Pendientes validación</span><strong id="kpiNeighborsPending">—</strong></article>
+      <article class="kpi"><span>Sirenas online</span><strong id="kpiSirensOnline">—</strong></article>
+      <article class="kpi"><span>Dispositivos online</span><strong id="kpiDevicesOnline">—</strong></article>
+      <article class="kpi"><span>Tiempo asignación</span><strong id="kpiAssignAvg">—</strong></article>
+      <article class="kpi"><span>SLA ack 5 min</span><strong id="kpiSlaAck">—</strong></article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel large">
+        <div class="panel-head">
+          <h2>Actividad de tickets</h2>
+          <p>Volumen diario y cierres del período seleccionado.</p>
+        </div>
+        <div class="chart-box tall"><canvas id="ticketsByDayChart"></canvas></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Estado de tickets</h2>
+          <p>Distribución operacional actual del período.</p>
+        </div>
+        <div class="chart-box"><canvas id="ticketsByStateChart"></canvas></div>
+      </article>
+    </section>
+
+    <section class="grid three">
+      <article class="panel">
+        <div class="panel-head"><h2>Tipo de emergencia</h2><p>Top categorías reportadas.</p></div>
+        <div class="chart-box"><canvas id="alertTypeChart"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>Canal de origen</h2><p>PWA, botón físico u otras fuentes.</p></div>
+        <div class="chart-box"><canvas id="sourceChart"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>Horario de demanda</h2><p>Distribución por hora del día.</p></div>
+        <div class="chart-box"><canvas id="hourChart"></canvas></div>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel">
+        <div class="panel-head"><h2>Calidad de servicio</h2><p>SLA y tiempos de respuesta.</p></div>
+        <div class="sla-grid">
+          <div class="sla-card"><span>Reconocimiento ≤ 5 min</span><strong id="slaAck">—</strong><small id="ackAvg">Promedio —</small></div>
+          <div class="sla-card"><span>Asignación ≤ 15 min</span><strong id="slaAssign">—</strong><small id="assignAvg">Promedio —</small></div>
+          <div class="sla-card"><span>Resolución ≤ 60 min</span><strong id="slaResolve">—</strong><small id="resolveAvg">Promedio —</small></div>
+        </div>
+        <div class="divider"></div>
+        <h3>Acciones operacionales</h3>
+        <div class="chart-box small"><canvas id="actionsChart"></canvas></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h2>Estado de plataforma</h2><p>Usuarios, resolutores, sirenas y dispositivos.</p></div>
+        <div class="health-grid">
+          <div class="health"><span>Usuarios activos</span><strong id="healthUsers">—</strong><small id="healthUsersDetail">—</small></div>
+          <div class="health"><span>Resolutores online</span><strong id="healthResolvers">—</strong><small id="healthResolversDetail">—</small></div>
+          <div class="health"><span>Sirenas activas</span><strong id="healthSirens">—</strong><small id="healthSirensDetail">—</small></div>
+          <div class="health"><span>Botones/dispositivos</span><strong id="healthDevices">—</strong><small id="healthDevicesDetail">—</small></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel">
+        <div class="panel-head"><h2>Vecinos con más tickets</h2><p>Permite detectar usuarios recurrentes o zonas críticas.</p></div>
+        <div class="chart-box"><canvas id="topNeighborsChart"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>Desempeño de resolutores</h2><p>Casos asignados y cerrados/resueltos.</p></div>
+        <div class="chart-box"><canvas id="topResolversChart"></canvas></div>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel table-panel">
+        <div class="panel-head"><h2>Tickets recientes</h2><p>Últimas alertas registradas en la plataforma.</p></div>
+        <div class="table-wrap"><table id="recentTicketsTable"></table></div>
+      </article>
+      <article class="panel table-panel">
+        <div class="panel-head"><h2>Resolutores</h2><p>Estado de disponibilidad y actualización GPS.</p></div>
+        <div class="table-wrap"><table id="resolverStatusTable"></table></div>
+      </article>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="panel-head"><h2>Vecinos pendientes de validación</h2><p>Usuarios que requieren revisión municipal.</p></div>
+      <div class="table-wrap"><table id="pendingUsersTable"></table></div>
+    </section>
+
+    <footer class="footer">
+      <span>VSTI · Sistema SOS Municipal</span>
+      <span>Dashboard preparado para operación, seguimiento y presentación comercial.</span>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
