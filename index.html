@@ -6,8 +6,11 @@
   <meta name="theme-color" content="#0f172a" />
   <title>SOS Municipal · Dashboard Ejecutivo</title>
   <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 </head>
 <body>
   <div id="loginView" class="login-wrap">
@@ -44,6 +47,13 @@
         </select>
         <input id="ccInput" class="cc-input" value="CC-VINA" title="Centro de control" />
         <button id="refreshBtn" class="btn secondary">Actualizar</button>
+        <select id="autoRefreshSelect" class="select compact" title="Actualización automática">
+          <option value="0">Auto: OFF</option>
+          <option value="10">Auto: 10s</option>
+          <option value="15" selected>Auto: 15s</option>
+          <option value="30">Auto: 30s</option>
+          <option value="60">Auto: 60s</option>
+        </select>
         <button id="exportBtn" class="btn secondary">Exportar CSV</button>
         <button id="printBtn" class="btn secondary">Imprimir</button>
         <button id="logoutBtn" class="btn ghost">Salir</button>
@@ -54,6 +64,7 @@
       <div><span class="dot ok"></span><strong id="userLabel">Sesión</strong></div>
       <div id="updatedAt">Actualizado: —</div>
       <div id="periodLabel">Período: —</div>
+      <div id="liveStatus">Auto: —</div>
     </section>
 
     <section class="hero-grid">
@@ -144,6 +155,44 @@
           <div class="health"><span>Sirenas activas</span><strong id="healthSirens">—</strong><small id="healthSirensDetail">—</small></div>
           <div class="health"><span>Botones/dispositivos</span><strong id="healthDevices">—</strong><small id="healthDevicesDetail">—</small></div>
         </div>
+      </article>
+    </section>
+
+
+    <section class="grid heat-map-grid">
+      <article class="panel map-panel">
+        <div class="panel-head map-head">
+          <div>
+            <h2>Mapa de calor municipal</h2>
+            <p>Concentración territorial de eventos SOS del período seleccionado. Permite identificar zonas críticas, recurrencia y distribución de demanda.</p>
+          </div>
+          <div class="map-actions">
+            <select id="heatModeSelect" class="select compact" title="Capa del mapa">
+              <option value="heat-points" selected>Calor + puntos</option>
+              <option value="heat">Solo calor</option>
+              <option value="points">Solo puntos</option>
+            </select>
+            <button id="fitMapBtn" class="btn secondary">Recentrar mapa</button>
+          </div>
+        </div>
+        <div id="mapSummary" class="map-summary">Cargando mapa territorial...</div>
+        <div id="municipalHeatMap" class="municipal-map" aria-label="Mapa de calor de eventos"></div>
+        <div class="map-legend">
+          <span><i class="legend-dot soft"></i>Baja concentración</span>
+          <span><i class="legend-dot mid"></i>Concentración media</span>
+          <span><i class="legend-dot hot"></i>Alta concentración</span>
+          <span><i class="legend-ring"></i>Evento individual</span>
+        </div>
+      </article>
+
+      <article class="panel table-panel hotzones-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Zonas con mayor recurrencia</h2>
+            <p>Agrupación aproximada por ubicación. Útil para justificar prevención, patrullaje, fiscalización o inversión.</p>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="hotZonesTable"></table></div>
       </article>
     </section>
 

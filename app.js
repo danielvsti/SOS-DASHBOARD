@@ -4,6 +4,15 @@ const USER_KEY = "sos_dashboard_user";
 const CC_KEY = "sos_dashboard_cc";
 
 let currentData = null;
+let isLoadingDashboard = false;
+let autoRefreshTimer = null;
+let autoRefreshSeconds = 15;
+let nextRefreshAt = null;
+let heatMap = null;
+let heatLayer = null;
+let heatMarkerLayer = null;
+let heatBounds = null;
+let heatUserMoved = false;
 const charts = {};
 
 const $ = (id) => document.getElementById(id);
@@ -63,6 +72,8 @@ const labelMap = {
   ACCIDENT: "Accidente",
   RISK: "Riesgo",
   OTHER: "Otro",
+  SIN_TIPO: "Sin tipo",
+  SIN_ORIGEN: "Sin origen",
   AVAILABLE: "Disponible",
   BUSY: "Ocupado",
   SIN_UBICACION: "Sin ubicación",
@@ -94,9 +105,11 @@ function showLogin() {
 
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
       ...authHeaders(),
       ...(options.headers || {})
     }
@@ -121,6 +134,7 @@ async function login() {
     if (data.user?.control_center_code) localStorage.setItem(CC_KEY, data.user.control_center_code);
     setMessage("Acceso correcto.", true);
     showApp();
+    startAutoRefresh();
     await loadDashboard();
   } catch (error) {
     setMessage(error.message);
@@ -143,20 +157,32 @@ async function checkSession() {
   }
 }
 
-async function loadDashboard() {
+async function loadDashboard(options = {}) {
+  const silent = !!options.silent;
+  if (isLoadingDashboard) return;
+  if (!$('appView') || $('appView').classList.contains('hidden')) return;
+
   const days = $("periodSelect").value;
   const cc = ($("ccInput").value || localStorage.getItem(CC_KEY) || "CC-VINA").trim().toUpperCase();
   $("ccInput").value = cc;
   localStorage.setItem(CC_KEY, cc);
+
+  isLoadingDashboard = true;
   $("refreshBtn").disabled = true;
+  if (!silent) setLiveStatus("Actualizando indicadores...", true);
+
   try {
-    const data = await api(`/dashboard/analytics?control_center_code=${encodeURIComponent(cc)}&days=${encodeURIComponent(days)}`);
+    const data = await api(`/dashboard/analytics?control_center_code=${encodeURIComponent(cc)}&days=${encodeURIComponent(days)}&_=${Date.now()}`);
     currentData = data;
     renderDashboard(data);
+    scheduleNextRefresh();
+    updateLiveStatus();
   } catch (error) {
-    alert(`No se pudo cargar el dashboard: ${error.message}`);
+    setLiveStatus(`Error actualización: ${error.message}`, false);
+    if (!silent) alert(`No se pudo cargar el dashboard: ${error.message}`);
     if (/sesión|operator|admin|unauthorized/i.test(error.message)) logout(false);
   } finally {
+    isLoadingDashboard = false;
     $("refreshBtn").disabled = false;
   }
 }
@@ -209,6 +235,7 @@ function renderDashboard(data) {
   setText("healthDevicesDetail", `${fmt(d.devices_total)} total · ${fmt(d.devices_sos_active)} SOS activo`);
 
   renderCharts(data);
+  renderHeatMap(data);
   renderTables(data);
 }
 
@@ -298,6 +325,138 @@ function chartOptions(opts = {}) {
   };
 }
 
+
+function getHeatMode() {
+  return $("heatModeSelect")?.value || localStorage.getItem("sos_dashboard_heat_mode") || "heat-points";
+}
+
+function toLatLng(item) {
+  const lat = Number(item?.latitude);
+  const lng = Number(item?.longitude ?? item?.lon ?? item?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return [lat, lng];
+}
+
+function ensureHeatMap(center) {
+  if (!window.L) return null;
+  const mapEl = $("municipalHeatMap");
+  if (!mapEl) return null;
+
+  const fallback = toLatLng(center) || [-33.01895, -71.55090];
+  if (!heatMap) {
+    heatMap = L.map("municipalHeatMap", {
+      zoomControl: true,
+      scrollWheelZoom: true,
+      preferCanvas: true
+    }).setView(fallback, 14);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(heatMap);
+
+    heatMarkerLayer = L.layerGroup().addTo(heatMap);
+    heatMap.on("dragstart zoomstart", () => { heatUserMoved = true; });
+    setTimeout(() => heatMap.invalidateSize(), 120);
+  }
+  return heatMap;
+}
+
+function renderHeatMap(data, forceFit = false) {
+  const geo = data.geo || {};
+  const center = {
+    latitude: data.control_center?.latitude || geo.center?.latitude,
+    longitude: data.control_center?.longitude || geo.center?.longitude
+  };
+  const map = ensureHeatMap(center);
+  if (!map) return;
+
+  const points = (geo.event_points || [])
+    .map((p) => ({ ...p, latitude: Number(p.latitude), longitude: Number(p.longitude), weight: Number(p.weight || 0.65) }))
+    .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
+  const zones = geo.top_zones || [];
+  const mode = getHeatMode();
+
+  if (heatLayer) {
+    map.removeLayer(heatLayer);
+    heatLayer = null;
+  }
+  if (heatMarkerLayer) heatMarkerLayer.clearLayers();
+
+  heatBounds = null;
+
+  if (points.length && mode !== "points" && window.L.heatLayer) {
+    const heatPoints = points.map((p) => [p.latitude, p.longitude, Math.max(0.35, Math.min(1, p.weight || 0.65))]);
+    heatLayer = L.heatLayer(heatPoints, {
+      radius: 34,
+      blur: 26,
+      minOpacity: 0.28,
+      maxZoom: 17,
+      gradient: { 0.25: "#38bdf8", 0.45: "#22c55e", 0.65: "#f59e0b", 0.9: "#ef4444" }
+    }).addTo(map);
+  }
+
+  if (points.length && mode !== "heat") {
+    points.slice(0, 500).forEach((p) => {
+      const isOpen = !["CLOSED", "CANCELLED", "RESOLVED"].includes(String(p.state || "").toUpperCase());
+      const marker = L.circleMarker([p.latitude, p.longitude], {
+        radius: isOpen ? 8 : 6,
+        weight: 2,
+        color: isOpen ? "#dc2626" : "#2563eb",
+        fillColor: isOpen ? "#fee2e2" : "#dbeafe",
+        fillOpacity: 0.82
+      });
+      marker.bindPopup(`
+        <div class="map-popup">
+          <strong>${dash(p.title || niceLabel(p.alert_type))}</strong><br>
+          <span>${badge(p.state)} ${badge(p.alert_type)}</span><br>
+          <small>${dash(p.citizen_name)} · ${date(p.created_at)}</small><br>
+          <small>${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}</small>
+        </div>
+      `);
+      marker.addTo(heatMarkerLayer);
+    });
+  }
+
+  if (points.length) {
+    heatBounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
+    if (forceFit || !heatUserMoved) {
+      map.fitBounds(heatBounds.pad(0.22), { maxZoom: 15, animate: false });
+    }
+  } else {
+    const fallback = toLatLng(center) || [-33.01895, -71.55090];
+    if (forceFit || !heatUserMoved) map.setView(fallback, 14);
+  }
+
+  const total = points.length;
+  const open = points.filter((p) => !["CLOSED", "CANCELLED", "RESOLVED"].includes(String(p.state || "").toUpperCase())).length;
+  const top = zones[0];
+  setText("mapSummary", total
+    ? `${fmt(total)} eventos georreferenciados · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}`
+    : "Sin eventos georreferenciados para el período seleccionado."
+  );
+
+  if ($("hotZonesTable")) {
+    $("hotZonesTable").innerHTML = table(
+      ["Zona", "Eventos", "Abiertos", "Tipo principal", "Último evento"],
+      zones.map((z, idx) => [
+        `<strong>#${idx + 1}</strong><br><small>${Number(z.latitude).toFixed(5)}, ${Number(z.longitude).toFixed(5)}</small>`,
+        fmt(z.tickets_count),
+        fmt(z.open_count),
+        badge(z.top_alert_type || "SIN_TIPO"),
+        date(z.last_ticket_at)
+      ])
+    );
+  }
+
+  setTimeout(() => map.invalidateSize(), 50);
+}
+
+function fitHeatMap() {
+  heatUserMoved = false;
+  if (currentData) renderHeatMap(currentData, true);
+}
+
 function renderTables(data) {
   const recent = data.operations?.recent_tickets || [];
   $("recentTicketsTable").innerHTML = table(
@@ -348,6 +507,64 @@ function table(headers, rows) {
 }
 function shortId(id) { return String(id || "").slice(0, 8).toUpperCase(); }
 
+function setLiveStatus(text, ok = true) {
+  const el = $("liveStatus");
+  if (!el) return;
+  el.textContent = text || "Auto: —";
+  el.className = ok ? "live-status ok" : "live-status error";
+}
+
+function updateLiveStatus() {
+  const el = $("liveStatus");
+  if (!el) return;
+  if (!autoRefreshSeconds) {
+    setLiveStatus("Auto: desactivado", true);
+    return;
+  }
+  const remaining = nextRefreshAt ? Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000)) : autoRefreshSeconds;
+  setLiveStatus(`Auto: cada ${autoRefreshSeconds}s · próxima en ${remaining}s`, true);
+}
+
+function scheduleNextRefresh() {
+  if (!autoRefreshSeconds) {
+    nextRefreshAt = null;
+    updateLiveStatus();
+    return;
+  }
+  nextRefreshAt = Date.now() + autoRefreshSeconds * 1000;
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  const select = $("autoRefreshSelect");
+  autoRefreshSeconds = Number(select?.value || localStorage.getItem("sos_dashboard_auto_refresh") || 15);
+  if (select) select.value = String(autoRefreshSeconds || 0);
+  scheduleNextRefresh();
+  updateLiveStatus();
+
+  autoRefreshTimer = setInterval(async () => {
+    if (!autoRefreshSeconds) return updateLiveStatus();
+    if (document.hidden) return updateLiveStatus();
+    if (Date.now() >= (nextRefreshAt || 0)) {
+      await loadDashboard({ silent: true });
+    } else {
+      updateLiveStatus();
+    }
+  }, 1000);
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = null;
+}
+
+function changeAutoRefresh() {
+  autoRefreshSeconds = Number($("autoRefreshSelect")?.value || 0);
+  localStorage.setItem("sos_dashboard_auto_refresh", String(autoRefreshSeconds));
+  scheduleNextRefresh();
+  updateLiveStatus();
+}
+
 function exportCsv() {
   if (!currentData) return;
   const rows = currentData.operations?.recent_tickets || [];
@@ -366,6 +583,7 @@ function exportCsv() {
 }
 
 function logout(reload = true) {
+  stopAutoRefresh();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   if (reload) location.reload();
@@ -375,8 +593,14 @@ function logout(reload = true) {
 window.addEventListener("DOMContentLoaded", async () => {
   $("loginBtn").addEventListener("click", login);
   $("loginPhone").addEventListener("keydown", (ev) => { if (ev.key === "Enter") login(); });
-  $("refreshBtn").addEventListener("click", loadDashboard);
-  $("periodSelect").addEventListener("change", loadDashboard);
+  $("refreshBtn").addEventListener("click", () => loadDashboard());
+  $("periodSelect").addEventListener("change", () => loadDashboard());
+  $("autoRefreshSelect").addEventListener("change", changeAutoRefresh);
+  $("heatModeSelect")?.addEventListener("change", () => {
+    localStorage.setItem("sos_dashboard_heat_mode", getHeatMode());
+    if (currentData) renderHeatMap(currentData, true);
+  });
+  $("fitMapBtn")?.addEventListener("click", fitHeatMap);
   $("exportBtn").addEventListener("click", exportCsv);
   $("printBtn").addEventListener("click", () => window.print());
   $("logoutBtn").addEventListener("click", () => logout(true));
@@ -384,11 +608,24 @@ window.addEventListener("DOMContentLoaded", async () => {
   const user = storedUser();
   if (user?.phone) $("loginPhone").value = user.phone;
   $("ccInput").value = localStorage.getItem(CC_KEY) || user?.control_center_code || "CC-VINA";
+  const storedAuto = localStorage.getItem("sos_dashboard_auto_refresh");
+  if (storedAuto !== null) $("autoRefreshSelect").value = storedAuto;
+  const storedHeatMode = localStorage.getItem("sos_dashboard_heat_mode");
+  if (storedHeatMode && $("heatModeSelect")) $("heatModeSelect").value = storedHeatMode;
 
   if (await checkSession()) {
     showApp();
+    startAutoRefresh();
     await loadDashboard();
   } else {
     showLogin();
+  }
+});
+
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    scheduleNextRefresh();
+    loadDashboard({ silent: true });
   }
 });
