@@ -738,9 +738,23 @@ async function askLucia(questionFromButton = null) {
     if (meta) {
       meta.textContent = `${niceLabel(lucia.intent)} · ${fmt(lucia.row_count)} filas · ${lucia.duration_ms || 0} ms · ${lucia.safety?.forced_control_center_code || "centro autorizado"}`;
     }
+    if (actions) {
+      actions.innerHTML = "";
+      const report = lucia.report;
+      if (report?.url) {
+        const a = document.createElement("a");
+        a.className = "btn secondary lucia-download";
+        a.href = API_BASE + report.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = "Descargar PDF Luc-IA";
+        actions.appendChild(a);
+      }
+    }
     renderGenericTable("luciaTable", lucia.columns || [], lucia.rows || []);
   } catch (error) {
     if (answer) answer.textContent = `Luc-IA no pudo responder: ${error.message}`;
+    if (actions) actions.innerHTML = "";
     renderGenericTable("luciaTable", [], []);
   } finally {
     if (btn) btn.disabled = false;

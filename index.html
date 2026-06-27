@@ -215,6 +215,8 @@
             <button class="chip lucia-suggestion" data-question="Dame un resumen ejecutivo de los últimos 30 días">Resumen ejecutivo</button>
             <button class="chip lucia-suggestion" data-question="Identifica zonas críticas de los últimos 30 días">Zonas críticas</button>
             <button class="chip lucia-suggestion" data-question="Muéstrame tickets fuera de SLA">Fuera de SLA</button>
+            <button class="chip lucia-suggestion" data-question="Muéstrame tickets de incendio de los últimos 30 días">Tickets incendio</button>
+            <button class="chip lucia-suggestion" data-question="Entrégame un reporte en PDF de los tickets abiertos">Reporte PDF</button>
           </div>
           <div class="lucia-input-row">
             <textarea id="luciaQuestion" class="lucia-input" rows="2" placeholder="Pregúntale a Luc-IA: por ejemplo, ¿qué tickets siguen sin asignar?"></textarea>
@@ -222,6 +224,7 @@
           </div>
           <div id="luciaAnswer" class="lucia-answer muted-answer">Luc-IA está lista para consultar datos reales de este centro de control.</div>
           <div id="luciaMeta" class="lucia-meta"></div>
+          <div id="luciaReportActions" class="lucia-report-actions"></div>
           <div class="table-wrap lucia-table-wrap"><table id="luciaTable"></table></div>
         </div>
       </article>
