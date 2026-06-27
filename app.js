@@ -11,7 +11,6 @@ let nextRefreshAt = null;
 let heatMap = null;
 let heatLayer = null;
 let heatMarkerLayer = null;
-let heatBoundaryLayer = null;
 let heatBounds = null;
 let heatUserMoved = false;
 const charts = {};
@@ -208,7 +207,7 @@ function renderDashboard(data) {
   setText("kpiResolveAvg", t.avg_resolve_human || humanMinutes(t.avg_resolve_minutes));
   setText("kpiSlaResolve", pct(t.sla_resolve_60m_pct));
   setText("kpiResolversAvailable", fmt(r.resolvers_available_now));
-  setText("kpiResolversOnline", fmt(r.resolvers_online));
+  setText("kpiResolversOnline", `${fmt(r.resolvers_online)} online · ${fmt(r.resolvers_busy)} ocupados`);
 
   setText("kpi24h", fmt(t.tickets_last_24h));
   setText("kpiPriority", fmt(t.tickets_high_priority));
@@ -229,7 +228,7 @@ function renderDashboard(data) {
   setText("healthUsers", fmt(u.users_active));
   setText("healthUsersDetail", `${fmt(u.users_total)} total · ${fmt(u.operators_total)} operadores · ${fmt(u.admins_total)} admin`);
   setText("healthResolvers", fmt(r.resolvers_online));
-  setText("healthResolversDetail", `${fmt(r.resolvers_total)} total · ${fmt(r.resolvers_offline)} offline`);
+  setText("healthResolversDetail", `${fmt(r.resolvers_total)} total · ${fmt(r.resolvers_available_now)} disponibles · ${fmt(r.resolvers_busy)} ocupados · ${fmt(r.resolvers_offline)} offline`);
   setText("healthSirens", fmt(s.sirens_active));
   setText("healthSirensDetail", `${fmt(s.sirens_total)} total · ${fmt(s.sirens_offline)} offline`);
   setText("healthDevices", fmt(d.devices_online));
@@ -363,86 +362,6 @@ function ensureHeatMap(center) {
   return heatMap;
 }
 
-
-function geoJsonLatLngsForBounds(geojson) {
-  if (!geojson) return [];
-  const geometry = geojson.type === "Feature" ? geojson.geometry
-    : geojson.type === "FeatureCollection" ? (geojson.features || []).map(f => f.geometry)
-    : geojson;
-  const points = [];
-  const walk = (value) => {
-    if (!value) return;
-    if (Array.isArray(value) && typeof value[0] === "number" && typeof value[1] === "number") {
-      points.push([Number(value[1]), Number(value[0])]);
-      return;
-    }
-    if (Array.isArray(value)) value.forEach(walk);
-    else if (value.coordinates) walk(value.coordinates);
-  };
-  walk(geometry);
-  return points.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
-}
-
-
-function normalizeGeoJsonGeometryList(geojson) {
-  if (!geojson) return [];
-  if (geojson.type === "FeatureCollection") return (geojson.features || []).map(f => f.geometry).filter(Boolean);
-  if (geojson.type === "Feature") return geojson.geometry ? [geojson.geometry] : [];
-  return geojson.type ? [geojson] : [];
-}
-
-function pointInRing(lng, lat, ring) {
-  // Ray-casting algorithm. GeoJSON coordinates are [lng, lat].
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = Number(ring[i][0]);
-    const yi = Number(ring[i][1]);
-    const xj = Number(ring[j][0]);
-    const yj = Number(ring[j][1]);
-    const intersects = ((yi > lat) !== (yj > lat)) &&
-      (lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || 1e-12) + xi);
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
-
-function pointInPolygonCoordinates(lng, lat, polygonCoords) {
-  if (!Array.isArray(polygonCoords) || !polygonCoords.length) return false;
-  // First ring is shell; subsequent rings are holes.
-  if (!pointInRing(lng, lat, polygonCoords[0])) return false;
-  for (let i = 1; i < polygonCoords.length; i++) {
-    if (pointInRing(lng, lat, polygonCoords[i])) return false;
-  }
-  return true;
-}
-
-function pointInGeoJson(lng, lat, geojson) {
-  const geometries = normalizeGeoJsonGeometryList(geojson);
-  for (const geom of geometries) {
-    if (!geom) continue;
-    if (geom.type === "Polygon" && pointInPolygonCoordinates(lng, lat, geom.coordinates)) return true;
-    if (geom.type === "MultiPolygon" && Array.isArray(geom.coordinates)) {
-      if (geom.coordinates.some(poly => pointInPolygonCoordinates(lng, lat, poly))) return true;
-    }
-  }
-  return false;
-}
-
-function normalizeHeatPoint(p) {
-  const latitude = Number(p?.latitude ?? p?.lat);
-  const longitude = Number(p?.longitude ?? p?.lon ?? p?.lng);
-  const weight = Number(p?.weight || 0.65);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-  return { ...p, latitude, longitude, weight };
-}
-
-function isOperationalHeatPoint(p, boundaryGeoJson) {
-  const jurisdiction = String(p?.jurisdiction_status || p?.jurisdiction?.status || "").toUpperCase();
-  if (jurisdiction === "OUT_OF_JURISDICTION") return false;
-  if (!boundaryGeoJson) return true;
-  return pointInGeoJson(Number(p.longitude), Number(p.latitude), boundaryGeoJson);
-}
-
 function renderHeatMap(data, forceFit = false) {
   const geo = data.geo || {};
   const center = {
@@ -452,11 +371,9 @@ function renderHeatMap(data, forceFit = false) {
   const map = ensureHeatMap(center);
   if (!map) return;
 
-  const allPoints = (geo.event_points || [])
-    .map(normalizeHeatPoint)
-    .filter(Boolean);
-  const points = allPoints.filter((p) => isOperationalHeatPoint(p, geo.boundary_geojson));
-  const outOfJurisdictionCount = allPoints.length - points.length;
+  const points = (geo.event_points || [])
+    .map((p) => ({ ...p, latitude: Number(p.latitude), longitude: Number(p.longitude), weight: Number(p.weight || 0.65) }))
+    .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
   const zones = geo.top_zones || [];
   const mode = getHeatMode();
 
@@ -464,27 +381,9 @@ function renderHeatMap(data, forceFit = false) {
     map.removeLayer(heatLayer);
     heatLayer = null;
   }
-  if (heatBoundaryLayer) {
-    map.removeLayer(heatBoundaryLayer);
-    heatBoundaryLayer = null;
-  }
   if (heatMarkerLayer) heatMarkerLayer.clearLayers();
 
   heatBounds = null;
-
-  if (geo.boundary_geojson && window.L.geoJSON) {
-    heatBoundaryLayer = L.geoJSON(geo.boundary_geojson, {
-      style: {
-        color: "#0f172a",
-        weight: 2,
-        opacity: 0.82,
-        fillColor: "#38bdf8",
-        fillOpacity: 0.06,
-        dashArray: "6 6"
-      }
-    }).addTo(map);
-    heatBoundaryLayer.bindPopup(`Límite operacional ${dash(data.control_center?.name || data.control_center?.code)}`);
-  }
 
   if (points.length && mode !== "points" && window.L.heatLayer) {
     const heatPoints = points.map((p) => [p.latitude, p.longitude, Math.max(0.35, Math.min(1, p.weight || 0.65))]);
@@ -519,34 +418,22 @@ function renderHeatMap(data, forceFit = false) {
     });
   }
 
-  const boundaryPoints = geoJsonLatLngsForBounds(geo.boundary_geojson);
-  if (boundaryPoints.length) {
-    // El límite comunal manda sobre los puntos. Esto evita que un evento de prueba
-    // fuera de la comuna aleje el dashboard hasta La Serena, Arica, etc.
-    heatBounds = L.latLngBounds(boundaryPoints);
-    if (forceFit || !heatUserMoved) {
-      map.fitBounds(heatBounds.pad(0.06), {
-        maxZoom: Number(geo.map_zoom || data.control_center?.map_zoom || 13),
-        animate: false
-      });
-    }
-  } else if (points.length) {
+  if (points.length) {
     heatBounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
     if (forceFit || !heatUserMoved) {
       map.fitBounds(heatBounds.pad(0.22), { maxZoom: 15, animate: false });
     }
   } else {
     const fallback = toLatLng(center) || [-33.01895, -71.55090];
-    if (forceFit || !heatUserMoved) map.setView(fallback, Number(geo.map_zoom || data.control_center?.map_zoom || 14));
+    if (forceFit || !heatUserMoved) map.setView(fallback, 14);
   }
 
   const total = points.length;
   const open = points.filter((p) => !["CLOSED", "CANCELLED", "RESOLVED"].includes(String(p.state || "").toUpperCase())).length;
   const top = zones[0];
-  const jurisdictionNote = outOfJurisdictionCount > 0 ? ` · ${fmt(outOfJurisdictionCount)} fuera de jurisdicción excluidos` : "";
   setText("mapSummary", total
-    ? `${fmt(total)} eventos georreferenciados dentro de la comuna · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}${jurisdictionNote}`
-    : (geo.boundary_geojson ? `Sin eventos georreferenciados dentro de la comuna para el período seleccionado. Se muestra el límite operacional comunal.${jurisdictionNote}` : "Sin eventos georreferenciados para el período seleccionado.")
+    ? `${fmt(total)} eventos georreferenciados · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}`
+    : "Sin eventos georreferenciados para el período seleccionado."
   );
 
   if ($("hotZonesTable")) {
@@ -587,13 +474,15 @@ function renderTables(data) {
 
   const resolvers = data.operations?.resolver_status || [];
   $("resolverStatusTable").innerHTML = table(
-    ["Resolutor", "Estado", "GPS", "Última actualización", "Activo"],
+    ["Resolutor", "Estado operativo", "Estado app", "GPS", "Casos activos", "Última actualización", "Activo"],
     resolvers.map(r => [
       `<strong>${dash(r.full_name)}</strong><br><small>${dash(r.phone)}</small>`,
+      badge(r.operational_state || r.status),
       badge(r.status),
-      badge(r.heartbeat),
+      `${badge(r.heartbeat)}<br><small>${r.accuracy != null ? `${Math.round(Number(r.accuracy))} m` : "—"}</small>`,
+      fmt(r.active_tickets_count),
       date(r.updated_at),
-      r.is_active ? badge("VALIDATED") : badge("OFFLINE")
+      r.is_active ? badge("ACTIVO") : badge("INACTIVO")
     ])
   );
 
