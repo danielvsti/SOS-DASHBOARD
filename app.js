@@ -725,6 +725,7 @@ async function askLucia(questionFromButton = null) {
   const btn = $("luciaAskBtn");
   const answer = $("luciaAnswer");
   const meta = $("luciaMeta");
+  const actions = $("luciaReportActions");
   if (btn) btn.disabled = true;
   if (answer) answer.textContent = "Luc-IA está consultando la base segura...";
   if (meta) meta.textContent = "";
@@ -736,7 +737,7 @@ async function askLucia(questionFromButton = null) {
     const lucia = data.lucia || {};
     if (answer) answer.textContent = lucia.answer || "Luc-IA respondió sin texto.";
     if (meta) {
-      meta.textContent = `${niceLabel(lucia.intent)} · ${fmt(lucia.row_count)} filas · ${lucia.duration_ms || 0} ms · ${lucia.safety?.forced_control_center_code || "centro autorizado"}`;
+      meta.textContent = `${niceLabel(lucia.intent)} · ${fmt(lucia.row_count)} filas · ${lucia.duration_ms || 0} ms · ${lucia.safety?.forced_control_center_code || "centro autorizado"}${lucia.sector_method ? " · " + lucia.sector_method : ""}`;
     }
     if (actions) {
       actions.innerHTML = "";
@@ -750,11 +751,43 @@ async function askLucia(questionFromButton = null) {
         a.textContent = "Descargar PDF Luc-IA";
         actions.appendChild(a);
       }
+      const suggestions = Array.isArray(lucia.suggestions) ? lucia.suggestions : [];
+      if (suggestions.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "lucia-followups";
+        suggestions.forEach(suggestion => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "chip lucia-followup";
+          b.textContent = suggestion.label || suggestion.question || "Consultar";
+          b.addEventListener("click", () => {
+            if ($("luciaQuestion")) $("luciaQuestion").value = suggestion.question || suggestion.label || "";
+            askLucia(suggestion.question || suggestion.label || "");
+          });
+          wrap.appendChild(b);
+        });
+        actions.appendChild(wrap);
+      }
     }
     renderGenericTable("luciaTable", lucia.columns || [], lucia.rows || []);
   } catch (error) {
-    if (answer) answer.textContent = `Luc-IA no pudo responder: ${error.message}`;
-    if (actions) actions.innerHTML = "";
+    console.error("Luc-IA error", error);
+    if (answer) answer.textContent = "Luc-IA tuvo un problema técnico al procesar la consulta. Prueba con una sugerencia o intenta nuevamente.";
+    if (actions) {
+      actions.innerHTML = "";
+      [
+        { label: "Tickets sin asignar", question: "Qué tickets siguen sin asignar" },
+        { label: "Resumen ejecutivo", question: "Dame un resumen ejecutivo" },
+        { label: "Zonas críticas", question: "Identifica zonas críticas" }
+      ].forEach(suggestion => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chip lucia-followup";
+        b.textContent = suggestion.label;
+        b.addEventListener("click", () => askLucia(suggestion.question));
+        actions.appendChild(b);
+      });
+    }
     renderGenericTable("luciaTable", [], []);
   } finally {
     if (btn) btn.disabled = false;

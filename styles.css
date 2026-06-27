@@ -387,3 +387,9 @@ tr:last-child td { border-bottom: 0; }
   align-items: center;
   justify-content: center;
 }
+
+
+/* v28.5 Luc-IA guided follow-up buttons */
+.lucia-report-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+.lucia-followups { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.lucia-followup { cursor: pointer; }
