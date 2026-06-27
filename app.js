@@ -90,6 +90,25 @@ const labelMap = {
 };
 function niceLabel(value) { return labelMap[value] || String(value || "—").replaceAll("_", " "); }
 
+function sectorFromCoords(latitude, longitude) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "Sector por determinar";
+
+  if (lat > -32.9800 && lon < -71.5300) return "Reñaca Bajo / Jardín del Mar";
+  if (lat > -33.0000 && lon > -71.5220) return "Gómez Carreño / Reñaca Alto / Glorias Navales";
+  if (lat > -33.0020 && lon >= -71.5320 && lon <= -71.5050) return "Santa Julia / Achupallas / Canal Beagle";
+  if (lat >= -33.0300 && lat <= -33.0100 && lon < -71.5400) return "Plan Viña / Libertad / Población Vergara";
+  if (lat >= -33.0300 && lat <= -33.0050 && lon >= -71.5400 && lon <= -71.5150) return "Miraflores / Chorrillos / Viña Oriente";
+  if (lat < -33.0350 && lon >= -71.5400 && lon <= -71.5150) return "Forestal";
+  if (lat < -33.0300 && lon < -71.5400) return "Recreo / Nueva Aurora / Agua Santa";
+  return "Sector por determinar dentro de la comuna";
+}
+
+function zoneLabelFromItem(item) {
+  return item?.sector_aproximado || item?.zona_critica || sectorFromCoords(item?.latitude, item?.longitude);
+}
+
 function badge(value) {
   const label = niceLabel(value);
   const v = String(value || "").toUpperCase();
@@ -519,7 +538,7 @@ function renderHeatMap(data, forceFit = false) {
           <strong>${dash(p.title || niceLabel(p.alert_type))}</strong><br>
           <span>${badge(p.state)} ${badge(p.alert_type)}</span><br>
           <small>${dash(p.citizen_name)} · ${date(p.created_at)}</small><br>
-          <small>${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}</small>
+          <small>${sectorFromCoords(p.latitude, p.longitude)}</small>
         </div>
       `);
       marker.addTo(heatMarkerLayer);
@@ -552,15 +571,15 @@ function renderHeatMap(data, forceFit = false) {
   const top = zones[0];
   const jurisdictionNote = outOfJurisdictionCount > 0 ? ` · ${fmt(outOfJurisdictionCount)} fuera de jurisdicción excluidos` : "";
   setText("mapSummary", total
-    ? `${fmt(total)} eventos georreferenciados dentro de la comuna · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}${jurisdictionNote}`
+    ? `${fmt(total)} eventos georreferenciados dentro de la comuna · ${fmt(open)} abiertos/en gestión · Zona principal: ${top ? `${zoneLabelFromItem(top)} · ${fmt(top.tickets_count)} eventos (${niceLabel(top.top_alert_type)})` : "sin agrupación"}${jurisdictionNote}`
     : (geo.boundary_geojson ? `Sin eventos georreferenciados dentro de la comuna para el período seleccionado. Se muestra el límite operacional comunal.${jurisdictionNote}` : "Sin eventos georreferenciados para el período seleccionado.")
   );
 
   if ($("hotZonesTable")) {
     $("hotZonesTable").innerHTML = table(
-      ["Zona", "Eventos", "Abiertos", "Tipo principal", "Último evento"],
+      ["Zona crítica", "Eventos", "Abiertos", "Tipo principal", "Último evento"],
       zones.map((z, idx) => [
-        `<strong>#${idx + 1}</strong><br><small>${Number(z.latitude).toFixed(5)}, ${Number(z.longitude).toFixed(5)}</small>`,
+        `<strong>#${idx + 1} · ${zoneLabelFromItem(z)}</strong><br><small>Agrupación territorial aproximada</small>`,
         fmt(z.tickets_count),
         fmt(z.open_count),
         badge(z.top_alert_type || "SIN_TIPO"),
