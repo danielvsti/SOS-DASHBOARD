@@ -1,9 +1,8 @@
 {
-  "name": "SOS Municipal Dashboard",
+  "name": "SOS Municipal Dashboard Luc-IA",
   "short_name": "SOS Dashboard",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#f3f6fb",
-  "theme_color": "#0f172a",
-  "icons": []
+  "theme_color": "#0f172a"
 }

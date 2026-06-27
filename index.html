@@ -196,6 +196,37 @@
       </article>
     </section>
 
+
+    <section class="grid lucia-grid">
+      <article class="panel lucia-panel">
+        <div class="panel-head lucia-head">
+          <div>
+            <div class="eyebrow">Asistente operacional</div>
+            <h2>Luc-IA</h2>
+            <p>Consulta la operación con SELECT restringidos al centro de control de tu sesión. No ejecuta INSERT, UPDATE ni DELETE.</p>
+          </div>
+          <span id="luciaSafety" class="lucia-safety">Solo lectura · Centro autorizado</span>
+        </div>
+        <div class="lucia-box">
+          <div class="lucia-suggestions">
+            <button class="chip lucia-suggestion" data-question="Muéstrame los 10 resolutores que más tickets han atendido este mes">Top resolutores del mes</button>
+            <button class="chip lucia-suggestion" data-question="Qué resolutores han rechazado más tickets este mes">Más rechazos</button>
+            <button class="chip lucia-suggestion" data-question="Qué tickets siguen sin asignar">Tickets sin asignar</button>
+            <button class="chip lucia-suggestion" data-question="Dame un resumen ejecutivo de los últimos 30 días">Resumen ejecutivo</button>
+            <button class="chip lucia-suggestion" data-question="Identifica zonas críticas de los últimos 30 días">Zonas críticas</button>
+            <button class="chip lucia-suggestion" data-question="Muéstrame tickets fuera de SLA">Fuera de SLA</button>
+          </div>
+          <div class="lucia-input-row">
+            <textarea id="luciaQuestion" class="lucia-input" rows="2" placeholder="Pregúntale a Luc-IA: por ejemplo, ¿qué tickets siguen sin asignar?"></textarea>
+            <button id="luciaAskBtn" class="btn primary">Preguntar</button>
+          </div>
+          <div id="luciaAnswer" class="lucia-answer muted-answer">Luc-IA está lista para consultar datos reales de este centro de control.</div>
+          <div id="luciaMeta" class="lucia-meta"></div>
+          <div class="table-wrap lucia-table-wrap"><table id="luciaTable"></table></div>
+        </div>
+      </article>
+    </section>
+
     <section class="grid two">
       <article class="panel">
         <div class="panel-head"><h2>Vecinos con más tickets</h2><p>Permite detectar usuarios recurrentes o zonas críticas.</p></div>
@@ -208,9 +239,33 @@
     </section>
 
     <section class="grid two">
-      <article class="panel table-panel">
-        <div class="panel-head"><h2>Tickets recientes</h2><p>Últimas alertas registradas en la plataforma.</p></div>
+      <article class="panel table-panel tickets-panel">
+        <div class="panel-head tickets-head">
+          <div>
+            <h2>Listado de tickets</h2>
+            <p>Paginado de 10 en 10 para liberar memoria y procesamiento del dashboard.</p>
+          </div>
+        </div>
+        <div class="ticket-tools">
+          <input id="ticketSearch" class="mini-input" placeholder="Buscar ticket, vecino o resolutor" />
+          <select id="ticketStateFilter" class="select compact">
+            <option value="">Todos los estados</option>
+            <option value="ACTIVE">Activo</option>
+            <option value="ASSIGNED">Asignado</option>
+            <option value="EN_ROUTE">En camino</option>
+            <option value="ON_SITE">En sitio</option>
+            <option value="RESOLVED">Resuelto</option>
+            <option value="CLOSED">Cerrado</option>
+            <option value="CANCELLED">Cancelado</option>
+          </select>
+          <button id="ticketSearchBtn" class="btn secondary">Buscar</button>
+        </div>
         <div class="table-wrap"><table id="recentTicketsTable"></table></div>
+        <div class="pager">
+          <button id="ticketsPrevBtn" class="btn secondary">← Anterior</button>
+          <span id="ticketsPageLabel">Página —</span>
+          <button id="ticketsNextBtn" class="btn secondary">Siguiente →</button>
+        </div>
       </article>
       <article class="panel table-panel">
         <div class="panel-head"><h2>Resolutores</h2><p>Estado de disponibilidad y actualización GPS.</p></div>

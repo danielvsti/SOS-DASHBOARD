@@ -13,6 +13,8 @@ let heatLayer = null;
 let heatMarkerLayer = null;
 let heatBounds = null;
 let heatUserMoved = false;
+let ticketsPage = 1;
+let ticketsPagination = null;
 const charts = {};
 
 const $ = (id) => document.getElementById(id);
@@ -79,7 +81,11 @@ const labelMap = {
   SIN_UBICACION: "Sin ubicación",
   ONLINE: "Online",
   DESACTUALIZADO: "Desactualizado",
-  OFFLINE: "Offline"
+  OFFLINE: "Offline",
+  GPS_INVALID: "GPS inválido",
+  STALE_GPS: "GPS vencido",
+  BLOCKED_NO_TICKET: "Bloqueado sin caso",
+  NO_GPS: "Sin GPS"
 };
 function niceLabel(value) { return labelMap[value] || String(value || "—").replaceAll("_", " "); }
 
@@ -175,6 +181,7 @@ async function loadDashboard(options = {}) {
     const data = await api(`/dashboard/analytics?control_center_code=${encodeURIComponent(cc)}&days=${encodeURIComponent(days)}&_=${Date.now()}`);
     currentData = data;
     renderDashboard(data);
+    await loadTicketsPage(1, { silent: true });
     scheduleNextRefresh();
     updateLiveStatus();
   } catch (error) {
@@ -458,19 +465,9 @@ function fitHeatMap() {
 }
 
 function renderTables(data) {
-  const recent = data.operations?.recent_tickets || [];
-  $("recentTicketsTable").innerHTML = table(
-    ["Ticket", "Estado", "Origen", "Vecino", "Resolutor", "Edad", "Creado"],
-    recent.map(t => [
-      `<strong>${shortId(t.id)}</strong><br><small>${dash(t.title || niceLabel(t.alert_type))}</small>`,
-      badge(t.state),
-      `${badge(t.source_type)}<br><small>${niceLabel(t.alert_type)}</small>`,
-      `${dash(t.citizen_name)}<br><small>${dash(t.citizen_phone)}</small>`,
-      dash(t.resolver_name),
-      humanMinutes(t.age_minutes),
-      date(t.created_at)
-    ])
-  );
+  if ($("recentTicketsTable") && !ticketsPagination) {
+    $("recentTicketsTable").innerHTML = `<tbody><tr><td class="empty">Cargando listado paginado...</td></tr></tbody>`;
+  }
 
   const resolvers = data.operations?.resolver_status || [];
   $("resolverStatusTable").innerHTML = table(
@@ -567,6 +564,100 @@ function changeAutoRefresh() {
   updateLiveStatus();
 }
 
+
+
+function renderGenericTable(elementId, columns, rows) {
+  const el = $(elementId);
+  if (!el) return;
+  if (!rows || !rows.length) {
+    el.innerHTML = `<tbody><tr><td class="empty">Sin datos para mostrar.</td></tr></tbody>`;
+    return;
+  }
+  const headers = columns.map(c => `<th>${dash(c).replaceAll("_", " ")}</th>`).join("");
+  const body = rows.map(row => `<tr>${columns.map(c => `<td>${formatCell(row[c])}</td>`).join("")}</tr>`).join("");
+  el.innerHTML = `<thead><tr>${headers}</tr></thead><tbody>${body}</tbody>`;
+}
+
+function formatCell(value) {
+  if (value == null || value === "") return "—";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return date(value);
+  if (typeof value === "number") return Number.isInteger(value) ? fmt(value) : value.toFixed(2);
+  const v = String(value);
+  if (["ACTIVE","ASSIGNED","EN_ROUTE","ON_SITE","RESOLVED","CLOSED","CANCELLED","VIF","MEDICAL","FIRE","SECURITY","ACCIDENT","RISK","OTHER"].includes(v.toUpperCase())) return badge(v);
+  return dash(v);
+}
+
+async function askLucia(questionFromButton = null) {
+  const q = (questionFromButton || $("luciaQuestion")?.value || "").trim();
+  if (!q) return;
+  const btn = $("luciaAskBtn");
+  const answer = $("luciaAnswer");
+  const meta = $("luciaMeta");
+  if (btn) btn.disabled = true;
+  if (answer) answer.textContent = "Luc-IA está consultando la base segura...";
+  if (meta) meta.textContent = "";
+  try {
+    const data = await api(`/dashboard/lucia/ask`, {
+      method: "POST",
+      body: JSON.stringify({ question: q })
+    });
+    const lucia = data.lucia || {};
+    if (answer) answer.textContent = lucia.answer || "Luc-IA respondió sin texto.";
+    if (meta) {
+      meta.textContent = `${niceLabel(lucia.intent)} · ${fmt(lucia.row_count)} filas · ${lucia.duration_ms || 0} ms · ${lucia.safety?.forced_control_center_code || "centro autorizado"}`;
+    }
+    renderGenericTable("luciaTable", lucia.columns || [], lucia.rows || []);
+  } catch (error) {
+    if (answer) answer.textContent = `Luc-IA no pudo responder: ${error.message}`;
+    renderGenericTable("luciaTable", [], []);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function loadTicketsPage(page = ticketsPage, options = {}) {
+  const silent = !!options.silent;
+  const state = $("ticketStateFilter")?.value || "";
+  const q = $("ticketSearch")?.value || "";
+  ticketsPage = Math.max(1, Number(page || 1));
+  try {
+    const data = await api(`/dashboard/tickets?page=${ticketsPage}&page_size=10&state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}&_=${Date.now()}`);
+    ticketsPagination = data.pagination;
+    renderTicketsTable(data.tickets || []);
+    renderTicketsPager(data.pagination || {});
+  } catch (error) {
+    if (!silent) alert(`No se pudo cargar el listado de tickets: ${error.message}`);
+    const tableEl = $("recentTicketsTable");
+    if (tableEl) tableEl.innerHTML = `<tbody><tr><td class="empty">Error cargando tickets: ${error.message}</td></tr></tbody>`;
+  }
+}
+
+function renderTicketsTable(rows) {
+  const el = $("recentTicketsTable");
+  if (!el) return;
+  el.innerHTML = table(
+    ["Ticket", "Estado", "Origen", "Vecino", "Resolutor", "Edad", "Creado"],
+    rows.map(t => [
+      `<strong>${shortId(t.id)}</strong><br><small>${dash(t.title || niceLabel(t.alert_type))}</small>`,
+      badge(t.state),
+      `${badge(t.source_type)}<br><small>${niceLabel(t.alert_type)}</small>`,
+      dash(t.citizen_name),
+      dash(t.resolver_name),
+      humanMinutes(t.age_minutes),
+      date(t.created_at)
+    ])
+  );
+}
+
+function renderTicketsPager(p) {
+  const label = $("ticketsPageLabel");
+  const prev = $("ticketsPrevBtn");
+  const next = $("ticketsNextBtn");
+  if (label) label.textContent = `Página ${p.page || 1} de ${p.total_pages || 1} · ${fmt(p.total || 0)} tickets`;
+  if (prev) prev.disabled = !p.has_prev;
+  if (next) next.disabled = !p.has_next;
+}
+
 function exportCsv() {
   if (!currentData) return;
   const rows = currentData.operations?.recent_tickets || [];
@@ -606,6 +697,20 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("exportBtn").addEventListener("click", exportCsv);
   $("printBtn").addEventListener("click", () => window.print());
   $("logoutBtn").addEventListener("click", () => logout(true));
+  $("luciaAskBtn")?.addEventListener("click", () => askLucia());
+  $("luciaQuestion")?.addEventListener("keydown", (ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") askLucia(); });
+  document.querySelectorAll(".lucia-suggestion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const q = btn.dataset.question || btn.textContent || "";
+      if ($("luciaQuestion")) $("luciaQuestion").value = q;
+      askLucia(q);
+    });
+  });
+  $("ticketSearchBtn")?.addEventListener("click", () => loadTicketsPage(1));
+  $("ticketSearch")?.addEventListener("keydown", (ev) => { if (ev.key === "Enter") loadTicketsPage(1); });
+  $("ticketStateFilter")?.addEventListener("change", () => loadTicketsPage(1));
+  $("ticketsPrevBtn")?.addEventListener("click", () => loadTicketsPage(Math.max(1, ticketsPage - 1)));
+  $("ticketsNextBtn")?.addEventListener("click", () => loadTicketsPage(ticketsPage + 1));
 
   const user = storedUser();
   if (user?.phone) $("loginPhone").value = user.phone;
