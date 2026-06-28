@@ -1,4 +1,5 @@
-const API_BASE = "https://sos.vsti.cl";
+const SOS_CONFIG = window.SOS_CONFIG || {};
+const API_BASE = SOS_CONFIG.API_BASE || "https://sos.vsti.cl";
 const TOKEN_KEY = "sos_dashboard_token";
 const USER_KEY = "sos_dashboard_user";
 const CC_KEY = "sos_dashboard_cc";
@@ -22,9 +23,27 @@ const $ = (id) => document.getElementById(id);
 const nf = new Intl.NumberFormat("es-CL");
 const dtf = new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short" });
 
-function token() { return localStorage.getItem(TOKEN_KEY) || ""; }
+function token() {
+  const active = sessionStorage.getItem(TOKEN_KEY) || "";
+  const legacy = localStorage.getItem(TOKEN_KEY) || "";
+  if (!active && legacy) {
+    sessionStorage.setItem(TOKEN_KEY, legacy);
+    localStorage.removeItem(TOKEN_KEY);
+    return legacy;
+  }
+  return active;
+}
 function storedUser() {
-  try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); }
+  try {
+    const active = sessionStorage.getItem(USER_KEY);
+    const legacy = localStorage.getItem(USER_KEY);
+    if (!active && legacy) {
+      sessionStorage.setItem(USER_KEY, legacy);
+      localStorage.removeItem(USER_KEY);
+      return JSON.parse(legacy || "null");
+    }
+    return JSON.parse(active || "null");
+  }
   catch { return null; }
 }
 function setMessage(text, ok = false) {
@@ -155,8 +174,10 @@ async function login() {
       method: "POST",
       body: JSON.stringify({ phone, panel_type: "CONTROL_CENTER" })
     });
-    localStorage.setItem(TOKEN_KEY, data.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    sessionStorage.setItem(TOKEN_KEY, data.token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     if (data.user?.control_center_code) localStorage.setItem(CC_KEY, data.user.control_center_code);
     setMessage("Acceso correcto.", true);
     showApp();
@@ -173,10 +194,13 @@ async function checkSession() {
   if (!token()) return false;
   try {
     const data = await api("/auth/session");
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    localStorage.removeItem(USER_KEY);
     if (data.user?.control_center_code) localStorage.setItem(CC_KEY, data.user.control_center_code);
     return true;
   } catch {
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     return false;
@@ -189,7 +213,8 @@ async function loadDashboard(options = {}) {
   if (!$('appView') || $('appView').classList.contains('hidden')) return;
 
   const days = $("periodSelect").value;
-  const cc = ($("ccInput").value || localStorage.getItem(CC_KEY) || "CC-VINA").trim().toUpperCase();
+  const sessionUser = storedUser() || {};
+  const cc = (sessionUser.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA").trim().toUpperCase();
   $("ccInput").value = cc;
   localStorage.setItem(CC_KEY, cc);
 
@@ -856,6 +881,8 @@ function exportCsv() {
 
 function logout(reload = true) {
   stopAutoRefresh();
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   if (reload) location.reload();
@@ -893,7 +920,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   const user = storedUser();
   if (user?.phone) $("loginPhone").value = user.phone;
-  $("ccInput").value = localStorage.getItem(CC_KEY) || user?.control_center_code || "CC-VINA";
+  $("ccInput").value = user?.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA";
   const storedAuto = localStorage.getItem("sos_dashboard_auto_refresh");
   if (storedAuto !== null) $("autoRefreshSelect").value = storedAuto;
   const storedHeatMode = localStorage.getItem("sos_dashboard_heat_mode");
