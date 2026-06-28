@@ -297,12 +297,16 @@ function renderDashboard(data) {
   setText("healthDevices", fmt(d.devices_online));
   setText("healthDevicesDetail", `${fmt(d.devices_total)} total · ${fmt(d.devices_sos_active)} SOS activo`);
 
+  updateLuciaFab(data);
   renderCharts(data);
   renderHeatMap(data);
   renderTables(data);
 }
 
-function setText(id, value) { $(id).textContent = dash(value); }
+function setText(id, value) {
+  const el = $(id);
+  if (el) el.textContent = dash(value);
+}
 
 function chart(id, config) {
   if (charts[id]) charts[id].destroy();
@@ -734,6 +738,47 @@ function changeAutoRefresh() {
 
 
 
+
+function updateLuciaFab(data) {
+  const t = data?.summary?.tickets || {};
+  const active = number(t.tickets_active);
+  const open = number(t.tickets_open);
+  const badgeValue = active || open;
+  const hint = active
+    ? `${fmt(active)} en cola`
+    : (open ? `${fmt(open)} abiertos` : "Operación normal");
+  setText("luciaFabHint", hint);
+  const badge = $("luciaFabBadge");
+  if (badge) {
+    badge.textContent = badgeValue > 99 ? "99+" : String(badgeValue);
+    badge.classList.toggle("hidden", !badgeValue);
+  }
+}
+
+function openLuciaDrawer(focusInput = false) {
+  const drawer = $("luciaDrawer");
+  const fab = $("luciaFab");
+  if (!drawer) return;
+  drawer.classList.remove("hidden");
+  fab?.setAttribute("aria-expanded", "true");
+  if (focusInput) setTimeout(() => $("luciaQuestion")?.focus(), 80);
+}
+
+function closeLuciaDrawer() {
+  const drawer = $("luciaDrawer");
+  const fab = $("luciaFab");
+  if (!drawer) return;
+  drawer.classList.add("hidden");
+  fab?.setAttribute("aria-expanded", "false");
+}
+
+function toggleLuciaDrawer() {
+  const drawer = $("luciaDrawer");
+  if (!drawer) return;
+  if (drawer.classList.contains("hidden")) openLuciaDrawer(true);
+  else closeLuciaDrawer();
+}
+
 function renderGenericTable(elementId, columns, rows) {
   const el = $(elementId);
   if (!el) return;
@@ -756,6 +801,7 @@ function formatCell(value) {
 }
 
 async function askLucia(questionFromButton = null) {
+  openLuciaDrawer(false);
   const q = (questionFromButton || $("luciaQuestion")?.value || "").trim();
   if (!q) return;
   const btn = $("luciaAskBtn");
@@ -763,7 +809,10 @@ async function askLucia(questionFromButton = null) {
   const meta = $("luciaMeta");
   const actions = $("luciaReportActions");
   if (btn) btn.disabled = true;
-  if (answer) answer.textContent = "Luc-IA está consultando la base segura...";
+  if (answer) {
+    answer.classList.remove("muted-answer");
+    answer.textContent = "Lucía está consultando la base segura...";
+  }
   if (meta) meta.textContent = "";
   try {
     const data = await api(`/dashboard/lucia/ask`, {
@@ -771,7 +820,7 @@ async function askLucia(questionFromButton = null) {
       body: JSON.stringify({ question: q })
     });
     const lucia = data.lucia || {};
-    if (answer) answer.textContent = lucia.answer || "Luc-IA respondió sin texto.";
+    if (answer) answer.textContent = lucia.answer || "Lucía respondió sin texto.";
     if (meta) {
       meta.textContent = `${niceLabel(lucia.intent)} · ${fmt(lucia.row_count)} filas · ${lucia.duration_ms || 0} ms · ${lucia.safety?.forced_control_center_code || "centro autorizado"}${lucia.sector_method ? " · " + lucia.sector_method : ""}`;
     }
@@ -784,7 +833,7 @@ async function askLucia(questionFromButton = null) {
         a.href = API_BASE + report.url;
         a.target = "_blank";
         a.rel = "noopener";
-        a.textContent = "Descargar PDF Luc-IA";
+        a.textContent = "Descargar PDF Lucía";
         actions.appendChild(a);
       }
       const suggestions = Array.isArray(lucia.suggestions) ? lucia.suggestions : [];
@@ -808,7 +857,7 @@ async function askLucia(questionFromButton = null) {
     renderGenericTable("luciaTable", lucia.columns || [], lucia.rows || []);
   } catch (error) {
     console.error("Luc-IA error", error);
-    if (answer) answer.textContent = "Luc-IA tuvo un problema técnico al procesar la consulta. Prueba con una sugerencia o intenta nuevamente.";
+    if (answer) answer.textContent = "Lucía tuvo un problema técnico al procesar la consulta. Prueba con una sugerencia o intenta nuevamente.";
     if (actions) {
       actions.innerHTML = "";
       [
@@ -914,11 +963,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("exportBtn").addEventListener("click", exportCsv);
   $("printBtn").addEventListener("click", () => window.print());
   $("logoutBtn").addEventListener("click", () => logout(true));
+  $("luciaFab")?.addEventListener("click", toggleLuciaDrawer);
+  $("luciaCloseBtn")?.addEventListener("click", closeLuciaDrawer);
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeLuciaDrawer(); });
   $("luciaAskBtn")?.addEventListener("click", () => askLucia());
   $("luciaQuestion")?.addEventListener("keydown", (ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") askLucia(); });
   document.querySelectorAll(".lucia-suggestion").forEach(btn => {
     btn.addEventListener("click", () => {
       const q = btn.dataset.question || btn.textContent || "";
+      openLuciaDrawer(false);
       if ($("luciaQuestion")) $("luciaQuestion").value = q;
       askLucia(q);
     });

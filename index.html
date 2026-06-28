@@ -196,40 +196,6 @@
     </section>
 
 
-    <section class="grid lucia-grid">
-      <article class="panel lucia-panel">
-        <div class="panel-head lucia-head">
-          <div>
-            <div class="eyebrow">Asistente operacional</div>
-            <h2>Luc-IA</h2>
-            <p>Consulta la operación con SELECT restringidos al centro de control de tu sesión. No ejecuta INSERT, UPDATE ni DELETE.</p>
-          </div>
-          <span id="luciaSafety" class="lucia-safety">Solo lectura · Centro autorizado</span>
-        </div>
-        <div class="lucia-box">
-          <div class="lucia-suggestions">
-            <button class="chip lucia-suggestion" data-question="Muéstrame los 10 resolutores que más tickets han atendido este mes">Top resolutores del mes</button>
-            <button class="chip lucia-suggestion" data-question="Qué resolutores han rechazado más tickets este mes">Más rechazos</button>
-            <button class="chip lucia-suggestion" data-question="Qué tickets siguen sin asignar">Tickets sin asignar</button>
-            <button class="chip lucia-suggestion" data-question="Dame un resumen ejecutivo de los últimos 30 días">Resumen ejecutivo</button>
-            <button class="chip lucia-suggestion" data-question="Identifica zonas críticas de los últimos 30 días">Zonas críticas</button>
-            <button class="chip lucia-suggestion" data-question="Muéstrame tickets fuera de SLA">Fuera de SLA</button>
-            <button class="chip lucia-suggestion" data-question="Muéstrame tickets de incendio de los últimos 30 días">Tickets incendio</button>
-            <button class="chip lucia-suggestion" data-question="Entrégame un reporte en PDF de los tickets abiertos">Reporte PDF</button>
-            <button class="chip lucia-suggestion" data-question="Ayuda: qué puedes consultar">Ayuda</button>
-          </div>
-          <div class="lucia-input-row">
-            <textarea id="luciaQuestion" class="lucia-input" rows="2" placeholder="Pregúntale a Luc-IA: por ejemplo, ¿qué tickets siguen sin asignar?"></textarea>
-            <button id="luciaAskBtn" class="btn primary">Preguntar</button>
-          </div>
-          <div id="luciaAnswer" class="lucia-answer muted-answer">Luc-IA está lista para consultar datos reales de este centro de control.</div>
-          <div id="luciaMeta" class="lucia-meta"></div>
-          <div id="luciaReportActions" class="lucia-report-actions"></div>
-          <div class="table-wrap lucia-table-wrap"><table id="luciaTable"></table></div>
-        </div>
-      </article>
-    </section>
-
     <section class="grid two">
       <article class="panel">
         <div class="panel-head"><h2>Vecinos con más tickets</h2><p>Permite detectar usuarios recurrentes o zonas críticas.</p></div>
@@ -280,6 +246,54 @@
       <div class="panel-head"><h2>Vecinos pendientes de validación</h2><p>Usuarios que requieren revisión municipal.</p></div>
       <div class="table-wrap"><table id="pendingUsersTable"></table></div>
     </section>
+
+
+    <div id="luciaWidget" class="lucia-widget" aria-live="polite">
+      <button id="luciaFab" class="lucia-fab" type="button" aria-expanded="false" aria-controls="luciaDrawer" title="Abrir Lucía">
+        <span class="lucia-fab-avatar">🤖</span>
+        <span class="lucia-fab-copy">
+          <strong>Lucía</strong>
+          <small id="luciaFabHint">IA operacional</small>
+        </span>
+        <span id="luciaFabBadge" class="lucia-fab-badge hidden">0</span>
+      </button>
+
+      <section id="luciaDrawer" class="lucia-drawer hidden" role="dialog" aria-modal="false" aria-labelledby="luciaDrawerTitle">
+        <div class="lucia-drawer-head">
+          <div>
+            <div class="eyebrow">Asistente operacional</div>
+            <h2 id="luciaDrawerTitle">Lucía</h2>
+            <p>Consulta la operación, genera reportes y revisa datos del centro autorizado.</p>
+          </div>
+          <button id="luciaCloseBtn" class="lucia-close" type="button" aria-label="Cerrar Lucía">×</button>
+        </div>
+
+        <div class="lucia-box">
+          <div class="lucia-status-row">
+            <span id="luciaSafety" class="lucia-safety">Solo lectura · Centro autorizado</span>
+            <span class="lucia-status-pill">PDF · CSV · Consulta segura</span>
+          </div>
+          <div class="lucia-suggestions" aria-label="Consultas rápidas de Lucía">
+            <button class="chip lucia-suggestion" data-question="Dame un resumen ejecutivo de los últimos 30 días">Resumen ejecutivo</button>
+            <button class="chip lucia-suggestion" data-question="Qué tickets siguen sin asignar">Tickets sin asignar</button>
+            <button class="chip lucia-suggestion" data-question="Identifica zonas críticas de los últimos 30 días">Zonas críticas</button>
+            <button class="chip lucia-suggestion" data-question="Muéstrame tickets fuera de SLA">Fuera de SLA</button>
+            <button class="chip lucia-suggestion" data-question="Qué resolutores han rechazado más tickets este mes">Más rechazos</button>
+            <button class="chip lucia-suggestion" data-question="Muéstrame los 10 resolutores que más tickets han atendido este mes">Top resolutores</button>
+            <button class="chip lucia-suggestion" data-question="Entrégame un reporte en PDF de los tickets abiertos">Reporte PDF</button>
+            <button class="chip lucia-suggestion" data-question="Ayuda: qué puedes consultar">Ayuda</button>
+          </div>
+          <div class="lucia-input-row">
+            <textarea id="luciaQuestion" class="lucia-input" rows="2" placeholder="Pregúntale a Lucía: por ejemplo, ¿qué tickets siguen sin asignar?"></textarea>
+            <button id="luciaAskBtn" class="btn primary">Preguntar</button>
+          </div>
+          <div id="luciaAnswer" class="lucia-answer muted-answer">Lucía está lista. Puedes pedirle un resumen, zonas críticas, tickets sin asignar o un PDF ejecutivo.</div>
+          <div id="luciaMeta" class="lucia-meta"></div>
+          <div id="luciaReportActions" class="lucia-report-actions"></div>
+          <div class="table-wrap lucia-table-wrap"><table id="luciaTable"></table></div>
+        </div>
+      </section>
+    </div>
 
     <footer class="footer">
       <span>VSTI · Sistema SOS Municipal</span>
