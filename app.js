@@ -66,6 +66,17 @@ function date(v) {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? "—" : dtf.format(d);
 }
+function compactDate(v) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(d);
+}
 function humanMinutes(mins) {
   const n = number(mins);
   if (!n) return "—";
@@ -129,9 +140,7 @@ function zoneLabelFromItem(item) {
 }
 
 function zoneMethodFromItem(item) {
-  const method = String(item?.sector_method || item?.event_sector_method || "").trim();
-  if (!method) return "Sector clasificado por coordenada";
-  return method;
+  return String(item?.sector_method || item?.event_sector_method || "").trim();
 }
 
 function badge(value) {
@@ -610,11 +619,11 @@ function renderHeatMap(data, forceFit = false) {
     $("hotZonesTable").innerHTML = table(
       ["Zona crítica", "Eventos", "Abiertos", "Tipo principal", "Último evento"],
       zones.map((z, idx) => [
-        `<div class="hot-zone-cell"><strong>#${idx + 1} · ${zoneLabelFromItem(z)}</strong><small>${zoneMethodFromItem(z)}</small></div>`,
+        `<div class="hot-zone-cell"><strong>#${idx + 1} · ${zoneLabelFromItem(z)}</strong></div>`,
         fmt(z.tickets_count),
         fmt(z.open_count),
         badge(z.top_alert_type || "SIN_TIPO"),
-        date(z.last_ticket_at)
+        compactDate(z.last_ticket_at)
       ])
     );
   }

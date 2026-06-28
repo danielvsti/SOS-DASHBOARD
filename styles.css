@@ -253,7 +253,7 @@ tr:last-child td { border-bottom: 0; }
 
 /* Heatmap territorial */
 .heat-map-grid {
-  grid-template-columns: minmax(0, 1.35fr) minmax(420px, .65fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, .55fr);
   align-items: start;
 }
 .map-panel {
@@ -282,7 +282,7 @@ tr:last-child td { border-bottom: 0; }
   font-weight: 900;
 }
 .municipal-map {
-  height: 560px;
+  height: 520px;
   width: 100%;
   border-radius: 24px;
   border: 1px solid var(--line);
@@ -324,29 +324,37 @@ tr:last-child td { border-bottom: 0; }
 }
 .hotzones-panel {
   align-self: start;
-  max-height: 740px;
+  max-height: 620px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 .hotzones-panel .table-wrap {
-  max-height: 610px;
+  max-height: 520px;
   overflow: auto;
 }
 .hotzones-panel table {
-  min-width: 520px;
+  min-width: 440px;
+  table-layout: fixed;
 }
 .hotzones-panel th,
 .hotzones-panel td {
-  padding: 12px 14px;
+  padding: 10px 12px;
+  vertical-align: top;
 }
+.hotzones-panel th:nth-child(1), .hotzones-panel td:nth-child(1) { width: 34%; }
+.hotzones-panel th:nth-child(2), .hotzones-panel td:nth-child(2),
+.hotzones-panel th:nth-child(3), .hotzones-panel td:nth-child(3) { width: 12%; text-align: center; }
+.hotzones-panel th:nth-child(4), .hotzones-panel td:nth-child(4) { width: 20%; }
+.hotzones-panel th:nth-child(5), .hotzones-panel td:nth-child(5) { width: 22%; white-space: nowrap; }
 .hot-zone-cell {
   display: grid;
-  gap: 5px;
-  min-width: 190px;
+  gap: 3px;
+  min-width: 0;
 }
 .hot-zone-cell strong {
-  line-height: 1.12;
+  line-height: 1.15;
+  font-size: 14px;
 }
 .hot-zone-cell small {
   color: var(--muted);
