@@ -254,6 +254,7 @@ tr:last-child td { border-bottom: 0; }
 /* Heatmap territorial */
 .heat-map-grid {
   grid-template-columns: minmax(0, 1.35fr) minmax(420px, .65fr);
+  align-items: start;
 }
 .map-panel {
   overflow: hidden;
@@ -321,8 +322,36 @@ tr:last-child td { border-bottom: 0; }
   border: 3px solid #dc2626;
   background: #fee2e2;
 }
+.hotzones-panel {
+  align-self: start;
+  max-height: 740px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hotzones-panel .table-wrap {
+  max-height: 610px;
+  overflow: auto;
+}
 .hotzones-panel table {
   min-width: 520px;
+}
+.hotzones-panel th,
+.hotzones-panel td {
+  padding: 12px 14px;
+}
+.hot-zone-cell {
+  display: grid;
+  gap: 5px;
+  min-width: 190px;
+}
+.hot-zone-cell strong {
+  line-height: 1.12;
+}
+.hot-zone-cell small {
+  color: var(--muted);
+  font-weight: 850;
+  line-height: 1.2;
 }
 .map-popup {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

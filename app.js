@@ -125,7 +125,13 @@ function sectorFromCoords(latitude, longitude) {
 }
 
 function zoneLabelFromItem(item) {
-  return item?.sector_aproximado || item?.zona_critica || sectorFromCoords(item?.latitude, item?.longitude);
+  return item?.sector_aproximado || item?.event_sector_name || item?.zona_critica || sectorFromCoords(item?.latitude, item?.longitude);
+}
+
+function zoneMethodFromItem(item) {
+  const method = String(item?.sector_method || item?.event_sector_method || "").trim();
+  if (!method) return "Sector clasificado por coordenada";
+  return method;
 }
 
 function badge(value) {
@@ -563,7 +569,7 @@ function renderHeatMap(data, forceFit = false) {
           <strong>${dash(p.title || niceLabel(p.alert_type))}</strong><br>
           <span>${badge(p.state)} ${badge(p.alert_type)}</span><br>
           <small>${dash(p.citizen_name)} · ${date(p.created_at)}</small><br>
-          <small>${sectorFromCoords(p.latitude, p.longitude)}</small>
+          <small>${zoneLabelFromItem(p)}</small>
         </div>
       `);
       marker.addTo(heatMarkerLayer);
@@ -604,7 +610,7 @@ function renderHeatMap(data, forceFit = false) {
     $("hotZonesTable").innerHTML = table(
       ["Zona crítica", "Eventos", "Abiertos", "Tipo principal", "Último evento"],
       zones.map((z, idx) => [
-        `<strong>#${idx + 1} · ${zoneLabelFromItem(z)}</strong><br><small>Agrupación territorial aproximada</small>`,
+        `<div class="hot-zone-cell"><strong>#${idx + 1} · ${zoneLabelFromItem(z)}</strong><small>${zoneMethodFromItem(z)}</small></div>`,
         fmt(z.tickets_count),
         fmt(z.open_count),
         badge(z.top_alert_type || "SIN_TIPO"),
