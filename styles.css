@@ -253,11 +253,13 @@ tr:last-child td { border-bottom: 0; }
 
 /* Heatmap territorial */
 .heat-map-grid {
-  grid-template-columns: minmax(0, 1.45fr) minmax(360px, .55fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 2.25fr) minmax(430px, .75fr);
+  align-items: stretch;
 }
 .map-panel {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .map-head {
   align-items: center;
@@ -282,7 +284,7 @@ tr:last-child td { border-bottom: 0; }
   font-weight: 900;
 }
 .municipal-map {
-  height: 520px;
+  height: 560px;
   width: 100%;
   border-radius: 24px;
   border: 1px solid var(--line);
@@ -323,43 +325,76 @@ tr:last-child td { border-bottom: 0; }
   background: #fee2e2;
 }
 .hotzones-panel {
-  align-self: start;
-  max-height: 620px;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+}
+.hotzones-panel .panel-head {
+  flex: 0 0 auto;
+  margin-bottom: 14px;
 }
 .hotzones-panel .table-wrap {
-  max-height: 520px;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 20px;
 }
 .hotzones-panel table {
-  min-width: 440px;
+  width: 100%;
+  min-width: 0;
   table-layout: fixed;
 }
 .hotzones-panel th,
 .hotzones-panel td {
-  padding: 10px 12px;
+  padding: 10px 9px;
   vertical-align: top;
+  line-height: 1.18;
 }
-.hotzones-panel th:nth-child(1), .hotzones-panel td:nth-child(1) { width: 34%; }
+.hotzones-panel th {
+  font-size: 10px;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.hotzones-panel td {
+  font-size: 14px;
+}
+.hotzones-panel th:nth-child(1), .hotzones-panel td:nth-child(1) { width: 43%; }
 .hotzones-panel th:nth-child(2), .hotzones-panel td:nth-child(2),
 .hotzones-panel th:nth-child(3), .hotzones-panel td:nth-child(3) { width: 12%; text-align: center; }
-.hotzones-panel th:nth-child(4), .hotzones-panel td:nth-child(4) { width: 20%; }
-.hotzones-panel th:nth-child(5), .hotzones-panel td:nth-child(5) { width: 22%; white-space: nowrap; }
+.hotzones-panel th:nth-child(4), .hotzones-panel td:nth-child(4) { width: 17%; text-align: center; }
+.hotzones-panel th:nth-child(5), .hotzones-panel td:nth-child(5) { width: 16%; white-space: nowrap; text-align: right; }
+.hotzones-panel .badge {
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 1.05;
+  max-width: 100%;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+}
 .hot-zone-cell {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 .hot-zone-cell strong {
-  line-height: 1.15;
-  font-size: 14px;
+  line-height: 1.12;
+  font-size: 13px;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
-.hot-zone-cell small {
-  color: var(--muted);
-  font-weight: 850;
-  line-height: 1.2;
+.hot-zone-count,
+.hot-zone-date {
+  display: inline-block;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.hot-zone-date {
+  font-size: 12px;
+  color: #1f2937;
 }
 .map-popup {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

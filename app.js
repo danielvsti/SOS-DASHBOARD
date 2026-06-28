@@ -70,12 +70,8 @@ function compactDate(v) {
   if (!v) return "—";
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-CL", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(d);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function humanMinutes(mins) {
   const n = number(mins);
@@ -617,13 +613,13 @@ function renderHeatMap(data, forceFit = false) {
 
   if ($("hotZonesTable")) {
     $("hotZonesTable").innerHTML = table(
-      ["Zona crítica", "Eventos", "Abiertos", "Tipo principal", "Último evento"],
+      ["Zona crítica", "Eventos", "Abiertos", "Tipo", "Último"],
       zones.map((z, idx) => [
         `<div class="hot-zone-cell"><strong>#${idx + 1} · ${zoneLabelFromItem(z)}</strong></div>`,
-        fmt(z.tickets_count),
-        fmt(z.open_count),
+        `<span class="hot-zone-count">${fmt(z.tickets_count)}</span>`,
+        `<span class="hot-zone-count">${fmt(z.open_count)}</span>`,
         badge(z.top_alert_type || "SIN_TIPO"),
-        compactDate(z.last_ticket_at)
+        `<span class="hot-zone-date">${compactDate(z.last_ticket_at)}</span>`
       ])
     );
   }
