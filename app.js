@@ -3,6 +3,11 @@ const API_BASE = SOS_CONFIG.API_BASE || "https://sos.vsti.cl";
 const TOKEN_KEY = "sos_dashboard_token";
 const USER_KEY = "sos_dashboard_user";
 const CC_KEY = "sos_dashboard_cc";
+const MAP_SESSION_ORIGINS = new Set([
+  "https://mapa.sos.vsti.cl",
+  "https://sos-map.onrender.com"
+]);
+let mapSessionHandoffResolver = null;
 
 let currentData = null;
 let isLoadingDashboard = false;
@@ -55,6 +60,45 @@ function setMessage(text, ok = false) {
 function authHeaders() {
   return token() ? { Authorization: `Bearer ${token()}` } : {};
 }
+
+function requestMapSessionHandoff(timeoutMs = 1800) {
+  if (!window.opener) return Promise.resolve(false);
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = accepted => {
+      if (settled) return;
+      settled = true;
+      mapSessionHandoffResolver = null;
+      resolve(accepted);
+    };
+    mapSessionHandoffResolver = finish;
+    MAP_SESSION_ORIGINS.forEach(origin => {
+      window.opener.postMessage({ type: "SOS_DASHBOARD_SESSION_REQUEST" }, origin);
+    });
+    setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
+window.addEventListener("message", event => {
+  if (!MAP_SESSION_ORIGINS.has(event.origin) || event.source !== window.opener) return;
+  const payload = event.data || {};
+  if (payload.type !== "SOS_DASHBOARD_SESSION") return;
+  if (typeof payload.token !== "string" || payload.token.length < 40) return;
+  if (!["OPERATOR", "ADMIN", "SUPER_ADMIN"].includes(String(payload.user?.role || "").toUpperCase())) return;
+
+  sessionStorage.setItem(TOKEN_KEY, payload.token);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(payload.user));
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  if (payload.control_center_code) localStorage.setItem(CC_KEY, String(payload.control_center_code).toUpperCase());
+
+  const url = new URL(location.href);
+  if (url.searchParams.has("source")) {
+    url.searchParams.delete("source");
+    history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+  }
+  mapSessionHandoffResolver?.(true);
+});
 function number(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -1064,6 +1108,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("ticketDetailClose")?.addEventListener("click", closeTicketDetail);
   $("ticketDetailModal")?.addEventListener("click", event => { if (event.target === $("ticketDetailModal")) closeTicketDetail(); });
 
+  if (!token()) await requestMapSessionHandoff();
   const user = storedUser();
   if (user?.phone) $("loginPhone").value = user.phone;
   $("ccInput").value = user?.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA";
