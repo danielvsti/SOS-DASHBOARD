@@ -615,6 +615,7 @@ tr:last-child td { border-bottom: 0; }
 .mini-input:focus { border-color: var(--blue); box-shadow: 0 0 0 5px rgba(37, 99, 235, .10); }
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; color: var(--muted); font-weight: 950; }
 .tickets-panel .table-wrap { min-height: 312px; }
+.ticket-row{cursor:pointer}.ticket-row:hover td{background:#eff6ff}.ticket-detail-modal{position:fixed;inset:0;z-index:4000;background:rgba(15,23,42,.68);display:grid;place-items:center;padding:24px}.ticket-detail-modal.hidden{display:none}.ticket-detail-dialog{width:min(1100px,96vw);max-height:92vh;overflow:auto;background:#f8fafc;border-radius:28px;box-shadow:0 40px 100px rgba(0,0,0,.35)}.ticket-detail-header{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:20px 24px;background:#0f172a;color:#fff}.ticket-detail-header h2{margin:4px 0 0}.ticket-detail-content{padding:22px;display:grid;gap:16px}.ticket-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.ticket-detail-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px}.ticket-detail-card.wide{grid-column:1/-1}.ticket-timeline{display:grid;gap:10px}.ticket-timeline-item{border-left:4px solid #3b82f6;background:#f8fafc;border-radius:0 14px 14px 0;padding:11px 14px}.ticket-media{display:block;width:100%;max-width:620px;margin-top:10px}.ticket-video{max-height:360px;background:#0f172a;border-radius:14px}.qr-attribution{background:#e0f2fe!important;border-color:#7dd3fc!important}.detail-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:900}.detail-value{font-size:16px;font-weight:850;margin-top:4px;overflow-wrap:anywhere}@media(max-width:760px){.ticket-detail-grid{grid-template-columns:1fr}.ticket-detail-modal{padding:8px}}
 @media (max-width: 820px) {
   .lucia-widget { right: 12px; bottom: 12px; }
   .lucia-fab { min-width: 0; padding-right: 12px; }
@@ -632,4 +633,103 @@ tr:last-child td { border-bottom: 0; }
 }
 @media print {
   .lucia-widget { display: none !important; }
+}
+
+
+/* ==========================================================================
+   REDISEÑO UI/UX v13 — SOS-DASHBOARD: refresh "ejecutivo" moderno
+   Capa 100% aditiva: ninguna regla anterior fue eliminada ni renombrada.
+   No se tocó app.js ni ningún ID/contrato de datos. Solo presentación.
+   ========================================================================== */
+
+.app{ padding-bottom: 12px; }
+
+/* Header ejecutivo: más peso visual, banda oscura de mando */
+.topbar{
+  background: linear-gradient(135deg, #0f172a, #1e3a8a 65%, #0f172a);
+  color:#fff;
+  border-radius: var(--radius);
+  padding: 26px 30px;
+  box-shadow: 0 30px 70px rgba(15,23,42,.28);
+}
+.topbar .subtitle{ color:#cbd5e1; }
+.topbar h1{ letter-spacing:-.02em; }
+.top-actions .select, .top-actions .cc-input{
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.22);
+  color:#fff;
+}
+.top-actions .select option{ color:#111827; }
+.top-actions .btn.secondary{ background:#fff; }
+
+.status-strip{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.14);
+  color:#e2e8f0;
+}
+.status-strip #updatedAt, .status-strip #periodLabel, .status-strip #liveStatus{ color:#e2e8f0; }
+
+/* Sistema de tarjetas: elevación y ritmo consistentes en toda la app,
+   para que se lea como un solo dashboard y no como tarjetas sueltas */
+.hero-card, .kpi, .panel{
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(15,23,42,.08);
+  transition: box-shadow .18s ease, transform .18s ease;
+}
+.hero-card:hover, .kpi:hover{ box-shadow: 0 20px 50px rgba(15,23,42,.12); }
+.hero-card.dark{ box-shadow: 0 24px 60px rgba(15,23,42,.30); }
+.hero-number{ letter-spacing:-.04em; }
+
+.panel-head h2, .panel > h2{ letter-spacing:-.01em; }
+.panel-head{ border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 18px; }
+
+.kpi{ border-top: 3px solid var(--blue); }
+.kpi:nth-child(2){ border-top-color: var(--green); }
+.kpi:nth-child(3){ border-top-color: var(--amber); }
+.kpi:nth-child(4){ border-top-color: var(--purple); }
+.kpi:nth-child(5){ border-top-color: var(--red); }
+.kpi:nth-child(6){ border-top-color: var(--blue); }
+.kpi:nth-child(7){ border-top-color: var(--green); }
+.kpi:nth-child(8){ border-top-color: var(--amber); }
+
+/* Tablas: mejor escaneo visual */
+.table-wrap table{ font-size: 14px; }
+.table-wrap thead th{
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+}
+.table-wrap tbody tr:hover{ background: #f8fafc; }
+
+.badge{ font-weight: 950; }
+
+/* --- Lucía: asistente ejecutiva, no widget improvisado --- */
+.lucia-fab{
+  min-width: 220px;
+  border: 2px solid rgba(255,255,255,.18);
+}
+.lucia-fab-copy strong{ font-size: 17px; }
+.lucia-fab-copy small{
+  font-size: 13px;
+  color:#fff;
+  background: rgba(255,255,255,.14);
+  border-radius: 999px;
+  padding: 2px 9px;
+  display:inline-block;
+  margin-top: 2px;
+}
+.lucia-fab-badge{
+  animation: luciaBadgePulse 2.2s ease-in-out infinite;
+}
+@keyframes luciaBadgePulse{
+  0%, 100%{ box-shadow: 0 14px 28px rgba(220,38,38,.24), 0 0 0 0 rgba(220,38,38,.45); }
+  50%{ box-shadow: 0 14px 28px rgba(220,38,38,.24), 0 0 0 8px rgba(220,38,38,0); }
+}
+.lucia-drawer-head{
+  background: linear-gradient(135deg, #0f172a, #1d4ed8 70%, #16a34a);
+}
+.lucia-box{ background: #fbfdff; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
 }

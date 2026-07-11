@@ -22,6 +22,7 @@ const charts = {};
 const $ = (id) => document.getElementById(id);
 const nf = new Intl.NumberFormat("es-CL");
 const dtf = new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short" });
+function escapeHtml(value) { return String(value ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 
 function token() {
   const active = sessionStorage.getItem(TOKEN_KEY) || "";
@@ -267,7 +268,7 @@ async function loadDashboard(options = {}) {
     const data = await api(`/dashboard/analytics?control_center_code=${encodeURIComponent(cc)}&days=${encodeURIComponent(days)}&_=${Date.now()}`);
     currentData = data;
     renderDashboard(data);
-    await loadTicketsPage(1, { silent: true });
+    await Promise.all([loadTicketsPage(1, { silent: true }), loadQrAnalytics(days)]);
     scheduleNextRefresh();
     updateLiveStatus();
   } catch (error) {
@@ -929,18 +930,53 @@ async function loadTicketsPage(page = ticketsPage, options = {}) {
 function renderTicketsTable(rows) {
   const el = $("recentTicketsTable");
   if (!el) return;
-  el.innerHTML = table(
-    ["Ticket", "Estado", "Origen", "Vecino", "Resolutor", "Edad", "Creado"],
-    rows.map(t => [
-      `<strong>${shortId(t.id)}</strong><br><small>${dash(t.title || niceLabel(t.alert_type))}</small>`,
-      badge(t.state),
-      `${badge(t.source_type)}<br><small>${niceLabel(t.alert_type)}</small>`,
-      dash(t.citizen_name),
-      dash(t.resolver_name),
-      humanMinutes(t.age_minutes),
-      date(t.created_at)
-    ])
-  );
+  if (!rows.length) { el.innerHTML = '<tbody><tr><td class="empty">Sin datos para mostrar.</td></tr></tbody>'; return; }
+  el.innerHTML = `<thead><tr>${["Ticket","Estado","Origen","Vecino","Resolutor","Edad","Creado"].map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(t => `
+    <tr class="ticket-row" data-ticket-id="${escapeHtml(t.id)}" title="Abrir ficha completa">
+      <td><strong>${shortId(t.id)}</strong><br><small>${escapeHtml(t.title || niceLabel(t.alert_type))}</small></td>
+      <td>${badge(t.state)}</td><td>${badge(t.source_type)}<br><small>${escapeHtml(niceLabel(t.alert_type))}</small></td>
+      <td>${escapeHtml(dash(t.citizen_name))}</td><td>${escapeHtml(dash(t.resolver_name))}</td><td>${humanMinutes(t.age_minutes)}</td><td>${date(t.created_at)}</td>
+    </tr>`).join("")}</tbody>`;
+}
+
+function metadataOf(action) { if (!action?.metadata) return {}; if (typeof action.metadata === "object") return action.metadata; try { return JSON.parse(action.metadata); } catch { return {}; } }
+function detailMedia(action) {
+  const metadata = metadataOf(action); const url = metadata.media_url || metadata.recording_url || "";
+  if (!url) return ""; const safe = escapeHtml(url);
+  if (action.action_type === "MEDIA_VIDEO") return `<video class="ticket-media ticket-video" controls playsinline preload="metadata" src="${safe}"></video>`;
+  return `<audio class="ticket-media" controls playsinline preload="metadata" src="${safe}"></audio>`;
+}
+
+async function openTicketDetail(ticketId) {
+  const modal = $("ticketDetailModal"); const content = $("ticketDetailContent");
+  modal.classList.remove("hidden"); content.innerHTML = '<div class="ticket-detail-card">Cargando ficha completa…</div>';
+  try {
+    const data = await api(`/tickets/${encodeURIComponent(ticketId)}`); const t = data.ticket || {};
+    $("ticketDetailTitle").textContent = `${shortId(t.id)} · ${t.title || niceLabel(t.alert_type)}`;
+    const actions = data.actions || []; const reports = data.reports || []; const voices = data.voice_sessions || [];
+    const actionHtml = actions.map(action => `<div class="ticket-timeline-item"><strong>${escapeHtml(niceLabel(action.action_type))}</strong><div>${escapeHtml(action.description || "")}</div><small>${escapeHtml(action.actor_name || action.actor_role || "Sistema")} · ${date(action.created_at)}</small>${detailMedia(action)}</div>`).join("");
+    const voiceHtml = voices.map(voice => `<div class="ticket-timeline-item"><strong>Llamada ${escapeHtml(voice.status || "")}</strong><div>${escapeHtml(voice.requested_by || "")} → ${escapeHtml(voice.target_type || "")}${voice.duration_seconds ? ` · ${voice.duration_seconds}s` : ""}</div>${voice.recording_url ? `<audio class="ticket-media" controls playsinline preload="metadata" src="${escapeHtml(voice.recording_url)}"></audio>` : '<small>Sin grabación disponible</small>'}</div>`).join("");
+    content.innerHTML = `<div class="ticket-detail-grid">
+      <div class="ticket-detail-card"><div class="detail-label">Estado</div><div class="detail-value">${badge(t.state)}</div></div>
+      <div class="ticket-detail-card"><div class="detail-label">Tipo / prioridad</div><div class="detail-value">${escapeHtml(niceLabel(t.alert_type))} · P${escapeHtml(t.priority)}</div></div>
+      <div class="ticket-detail-card"><div class="detail-label">Creación</div><div class="detail-value">${date(t.created_at)}</div></div>
+      <div class="ticket-detail-card"><div class="detail-label">Vecino</div><div class="detail-value">${escapeHtml(t.citizen_name || "—")}<br>${escapeHtml(t.citizen_phone || "")}</div></div>
+      <div class="ticket-detail-card"><div class="detail-label">Resolutor</div><div class="detail-value">${escapeHtml(t.resolver_name || "Sin asignar")}<br>${escapeHtml(t.resolver_phone || "")}</div></div>
+      <div class="ticket-detail-card"><div class="detail-label">Ubicación del evento</div><div class="detail-value">${escapeHtml(t.incident_sector_name || t.declared_address || "—")}<br><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${Number(t.latitude)},${Number(t.longitude)}">Ver en mapa</a></div></div>
+      ${t.qr_code ? `<div class="ticket-detail-card wide qr-attribution"><div class="detail-label">Origen QR identificado</div><div class="detail-value">${escapeHtml(t.qr_point_name)} · ${escapeHtml(t.qr_code)}</div><div>El SOS fue enviado desde el GPS real del teléfono; el QR sólo identifica el punto de acceso.</div></div>` : ""}
+      <div class="ticket-detail-card wide"><h3>Historial operacional</h3><div class="ticket-timeline">${actionHtml || "Sin acciones registradas"}</div></div>
+      <div class="ticket-detail-card wide"><h3>Llamadas y grabaciones</h3><div class="ticket-timeline">${voiceHtml || "No hubo sesiones de llamada"}</div></div>
+      <div class="ticket-detail-card wide"><h3>Reportes ciudadanos asociados (${reports.length})</h3>${reports.map(r=>`<div class="ticket-timeline-item"><strong>${escapeHtml(r.reporter_name || "Vecino")}</strong> · ${escapeHtml(r.title || r.alert_type || "Reporte")}<br><small>${date(r.created_at)}</small></div>`).join("") || "Sin reportes asociados"}</div>
+    </div>`;
+  } catch (error) { content.innerHTML = `<div class="ticket-detail-card">${escapeHtml(error.message)}</div>`; }
+}
+
+function closeTicketDetail() { $("ticketDetailModal")?.classList.add("hidden"); }
+
+async function loadQrAnalytics(days) {
+  const tableEl = $("qrAnalyticsTable"); if (!tableEl) return;
+  try { const data = await api(`/dashboard/qr-analytics?days=${encodeURIComponent(days)}`); tableEl.innerHTML = table(["Punto QR","Código","Accesos","Visitantes","SOS generados","Último acceso"], (data.points||[]).map(p=>[escapeHtml(p.name),escapeHtml(p.code),fmt(p.visits),fmt(p.unique_visitors),fmt(p.sos_events),date(p.last_visit_at)])); }
+  catch(error){ tableEl.innerHTML = `<tbody><tr><td class="empty">${escapeHtml(error.message)}</td></tr></tbody>`; }
 }
 
 function renderTicketsPager(p) {
@@ -952,21 +988,28 @@ function renderTicketsPager(p) {
   if (next) next.disabled = !p.has_next;
 }
 
-function exportCsv() {
-  if (!currentData) return;
-  const rows = currentData.operations?.recent_tickets || [];
-  const header = ["id", "titulo", "tipo", "origen", "estado", "prioridad", "vecino", "telefono", "resolutor", "creado"];
-  const csvRows = [header, ...rows.map(t => [
-    t.id, t.title, t.alert_type, t.source_type, t.state, t.priority, t.citizen_name, t.citizen_phone, t.resolver_name, t.created_at
-  ])];
-  const csv = csvRows.map(row => row.map(cell => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+async function allTicketsForReport() {
+  const state = $("ticketStateFilter")?.value || ""; const q = $("ticketSearch")?.value || "";
+  const data = await api(`/dashboard/tickets?page=1&page_size=1000&state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}&_=${Date.now()}`);
+  return data.tickets || [];
+}
+
+async function exportExcel() {
+  const rows = await allTicketsForReport();
+  const body = rows.map(t=>`<tr><td>${escapeHtml(t.id)}</td><td>${escapeHtml(t.title)}</td><td>${escapeHtml(niceLabel(t.alert_type))}</td><td>${escapeHtml(niceLabel(t.state))}</td><td>${escapeHtml(t.citizen_name||"")}</td><td>${escapeHtml(t.resolver_name||"")}</td><td>${escapeHtml(t.created_at||"")}</td></tr>`).join("");
+  const excel = `<!doctype html><html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>ID</th><th>Título</th><th>Tipo</th><th>Estado</th><th>Vecino</th><th>Resolutor</th><th>Creado</th></tr>${body}</table></body></html>`;
+  const blob = new Blob([excel], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `sos-dashboard-tickets-${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `sos-tickets-${new Date().toISOString().slice(0,10)}.xls`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function printTicketsReport() {
+  const rows = await allTicketsForReport(); const win = window.open("", "_blank"); if (!win) return alert("Habilita ventanas emergentes para generar PDF"); win.opener = null;
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte SOS</title><style>body{font-family:Arial;color:#0f172a;padding:24px}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}@page{size:landscape}</style></head><body><h1>Reporte de tickets SOS</h1><p>${escapeHtml($("ccInput").value)} · ${new Date().toLocaleString("es-CL")} · ${rows.length} tickets</p><table><tr><th>ID</th><th>Título</th><th>Tipo</th><th>Estado</th><th>Vecino</th><th>Resolutor</th><th>Creado</th></tr>${rows.map(t=>`<tr><td>${shortId(t.id)}</td><td>${escapeHtml(t.title||"")}</td><td>${escapeHtml(niceLabel(t.alert_type))}</td><td>${escapeHtml(niceLabel(t.state))}</td><td>${escapeHtml(t.citizen_name||"")}</td><td>${escapeHtml(t.resolver_name||"")}</td><td>${date(t.created_at)}</td></tr>`).join("")}</table><script>onload=()=>print()<\/script></body></html>`); win.document.close();
 }
 
 function logout(reload = true) {
@@ -990,12 +1033,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (currentData) renderHeatMap(currentData, true);
   });
   $("fitMapBtn")?.addEventListener("click", fitHeatMap);
-  $("exportBtn").addEventListener("click", exportCsv);
-  $("printBtn").addEventListener("click", () => window.print());
+  $("exportBtn").addEventListener("click", () => exportExcel().catch(error => alert(error.message)));
+  $("printBtn").addEventListener("click", () => printTicketsReport().catch(error => alert(error.message)));
   $("logoutBtn").addEventListener("click", () => logout(true));
   $("luciaFab")?.addEventListener("click", toggleLuciaDrawer);
   $("luciaCloseBtn")?.addEventListener("click", closeLuciaDrawer);
-  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeLuciaDrawer(); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { closeLuciaDrawer(); closeTicketDetail(); } });
   $("luciaAskBtn")?.addEventListener("click", () => askLucia());
   $("luciaQuestion")?.addEventListener("keydown", (ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") askLucia(); });
   document.querySelectorAll(".lucia-suggestion").forEach(btn => {
@@ -1011,6 +1054,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("ticketStateFilter")?.addEventListener("change", () => loadTicketsPage(1));
   $("ticketsPrevBtn")?.addEventListener("click", () => loadTicketsPage(Math.max(1, ticketsPage - 1)));
   $("ticketsNextBtn")?.addEventListener("click", () => loadTicketsPage(ticketsPage + 1));
+  $("recentTicketsTable")?.addEventListener("click", event => { const row = event.target.closest("[data-ticket-id]"); if (row) openTicketDetail(row.dataset.ticketId); });
+  $("ticketDetailClose")?.addEventListener("click", closeTicketDetail);
+  $("ticketDetailModal")?.addEventListener("click", event => { if (event.target === $("ticketDetailModal")) closeTicketDetail(); });
 
   const user = storedUser();
   if (user?.phone) $("loginPhone").value = user.phone;

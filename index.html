@@ -56,8 +56,8 @@
           <option value="30">Auto: 30s</option>
           <option value="60">Auto: 60s</option>
         </select>
-        <button id="exportBtn" class="btn secondary">Exportar CSV</button>
-        <button id="printBtn" class="btn secondary">Imprimir</button>
+        <button id="exportBtn" class="btn secondary">Exportar Excel</button>
+        <button id="printBtn" class="btn secondary">Reporte PDF</button>
         <button id="logoutBtn" class="btn ghost">Salir</button>
       </div>
     </header>
@@ -249,6 +249,18 @@
       <div class="table-wrap"><table id="pendingUsersTable"></table></div>
     </section>
 
+    <section class="panel table-panel qr-analytics-panel">
+      <div class="panel-head"><h2>Accesos desde señalética QR</h2><p>Aperturas de PWA y emergencias generadas por cada punto instalado.</p></div>
+      <div class="table-wrap"><table id="qrAnalyticsTable"></table></div>
+    </section>
+
+    <div id="ticketDetailModal" class="ticket-detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ticketDetailTitle">
+      <div class="ticket-detail-dialog">
+        <div class="ticket-detail-header"><div><div class="eyebrow">Ficha operacional</div><h2 id="ticketDetailTitle">Detalle del ticket</h2></div><button id="ticketDetailClose" class="btn ghost" type="button">✕ Cerrar</button></div>
+        <div id="ticketDetailContent" class="ticket-detail-content"></div>
+      </div>
+    </div>
+
 
     <div id="luciaWidget" class="lucia-widget" aria-live="polite">
       <button id="luciaFab" class="lucia-fab" type="button" aria-expanded="false" aria-controls="luciaDrawer" title="Abrir Lucía">
@@ -303,6 +315,6 @@
     </footer>
   </main>
 
-  <script src="app.js?v=20260711-sprint0-2"></script>
+  <script src="app.js?v=dashboard-detail-v1"></script>
 </body>
 </html>
