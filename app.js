@@ -175,6 +175,26 @@ async function api(path, options = {}) {
   return data;
 }
 
+function isNetworkFetchError(error) {
+  return /failed to fetch|networkerror|load failed|internet connection/i.test(String(error?.message || error || ""));
+}
+
+async function requestPanelLogin(payload, { retryNetwork = false } = {}) {
+  try {
+    return await api("/auth/panel-login", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    if (!retryNetwork || !isNetworkFetchError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return api("/auth/panel-login", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+}
+
 async function login() {
   const phone = $("loginPhone").value.trim();
   const code = $("loginCode").value.trim();
@@ -182,15 +202,12 @@ async function login() {
   $("loginBtn").disabled = true;
   setMessage(code ? "Validando código..." : "Enviando código...", true);
   try {
-    const data = await api("/auth/panel-login", {
-      method: "POST",
-      body: JSON.stringify({
-        phone,
-        panel_type: "CONTROL_CENTER",
-        code: code || undefined,
-        channel: SOS_CONFIG.DEMO_MODE ? "demo" : undefined
-      })
-    });
+    const data = await requestPanelLogin({
+      phone,
+      panel_type: "CONTROL_CENTER",
+      code: code || undefined,
+      channel: SOS_CONFIG.DEMO_MODE ? "demo" : undefined
+    }, { retryNetwork: !code });
     if (data.requires_verification) {
       setMessage(data.demo_code ? `Código demo: ${data.demo_code}` : `Código enviado por ${data.otp_channel || "SMS"}.`, true);
       $("loginCode").focus();
@@ -206,7 +223,9 @@ async function login() {
     startAutoRefresh();
     await loadDashboard();
   } catch (error) {
-    setMessage(error.message);
+    setMessage(isNetworkFetchError(error)
+      ? "No fue posible conectar con la plataforma SOS. Verifica Internet y vuelve a intentar."
+      : error.message);
   } finally {
     $("loginBtn").disabled = false;
   }
