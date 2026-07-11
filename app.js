@@ -177,14 +177,25 @@ async function api(path, options = {}) {
 
 async function login() {
   const phone = $("loginPhone").value.trim();
+  const code = $("loginCode").value.trim();
   if (!phone) return setMessage("Ingresa el teléfono del operador o administrador.");
   $("loginBtn").disabled = true;
-  setMessage("Validando acceso...", true);
+  setMessage(code ? "Validando código..." : "Enviando código...", true);
   try {
     const data = await api("/auth/panel-login", {
       method: "POST",
-      body: JSON.stringify({ phone, panel_type: "CONTROL_CENTER" })
+      body: JSON.stringify({
+        phone,
+        panel_type: "CONTROL_CENTER",
+        code: code || undefined,
+        channel: SOS_CONFIG.DEMO_MODE ? "demo" : undefined
+      })
     });
+    if (data.requires_verification) {
+      setMessage(data.demo_code ? `Código demo: ${data.demo_code}` : `Código enviado por ${data.otp_channel || "SMS"}.`, true);
+      $("loginCode").focus();
+      return;
+    }
     sessionStorage.setItem(TOKEN_KEY, data.token);
     sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
     localStorage.removeItem(TOKEN_KEY);
