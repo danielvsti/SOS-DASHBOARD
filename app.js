@@ -966,7 +966,7 @@ async function openTicketDetail(ticketId) {
       ${t.qr_code ? `<div class="ticket-detail-card wide qr-attribution"><div class="detail-label">Origen QR identificado</div><div class="detail-value">${escapeHtml(t.qr_point_name)} · ${escapeHtml(t.qr_code)}</div><div>El SOS fue enviado desde el GPS real del teléfono; el QR sólo identifica el punto de acceso.</div></div>` : ""}
       <div class="ticket-detail-card wide"><h3>Historial operacional</h3><div class="ticket-timeline">${actionHtml || "Sin acciones registradas"}</div></div>
       <div class="ticket-detail-card wide"><h3>Llamadas y grabaciones</h3><div class="ticket-timeline">${voiceHtml || "No hubo sesiones de llamada"}</div></div>
-      <div class="ticket-detail-card wide"><h3>Reportes ciudadanos asociados (${reports.length})</h3>${reports.map(r=>`<div class="ticket-timeline-item"><strong>${escapeHtml(r.reporter_name || "Vecino")}</strong> · ${escapeHtml(r.title || r.alert_type || "Reporte")}<br><small>${date(r.created_at)}</small></div>`).join("") || "Sin reportes asociados"}</div>
+      <div class="ticket-detail-card wide"><h3>Reportes ciudadanos asociados (${reports.length})</h3>${reports.map(r=>`<div class="ticket-timeline-item"><strong>${escapeHtml(r.reporter_name || "Vecino")}</strong> · ${escapeHtml(r.title || r.alert_type || "Reporte")}<br><small>${date(r.created_at)}${r.qr_code ? ` · Acceso QR: ${escapeHtml(r.qr_point_name || r.qr_code)}` : ""}</small></div>`).join("") || "Sin reportes asociados"}</div>
     </div>`;
   } catch (error) { content.innerHTML = `<div class="ticket-detail-card">${escapeHtml(error.message)}</div>`; }
 }
@@ -990,8 +990,14 @@ function renderTicketsPager(p) {
 
 async function allTicketsForReport() {
   const state = $("ticketStateFilter")?.value || ""; const q = $("ticketSearch")?.value || "";
-  const data = await api(`/dashboard/tickets?page=1&page_size=1000&state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}&_=${Date.now()}`);
-  return data.tickets || [];
+  const first = await api(`/dashboard/tickets?page=1&page_size=1000&state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}&_=${Date.now()}`);
+  const rows = [...(first.tickets || [])];
+  const totalPages = Number(first.pagination?.total_pages || 1);
+  for (let page = 2; page <= totalPages; page += 1) {
+    const data = await api(`/dashboard/tickets?page=${page}&page_size=1000&state=${encodeURIComponent(state)}&q=${encodeURIComponent(q)}&_=${Date.now()}`);
+    rows.push(...(data.tickets || []));
+  }
+  return rows;
 }
 
 async function exportExcel() {
