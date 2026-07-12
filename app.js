@@ -301,7 +301,10 @@ async function loadDashboard(options = {}) {
 
   const days = $("periodSelect").value;
   const sessionUser = storedUser() || {};
-  const cc = (sessionUser.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA").trim().toUpperCase();
+  const requestedCc = new URLSearchParams(location.search).get("cc");
+  const cc = (sessionUser.role === "SUPER_ADMIN" && requestedCc
+    ? requestedCc
+    : sessionUser.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA").trim().toUpperCase();
   $("ccInput").value = cc;
   localStorage.setItem(CC_KEY, cc);
 
@@ -1118,7 +1121,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (!token()) await requestMapSessionHandoff();
   const user = storedUser();
   if (user?.phone) $("loginPhone").value = user.phone;
-  $("ccInput").value = user?.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA";
+  const requestedCc = new URLSearchParams(location.search).get("cc");
+  $("ccInput").value = user?.role === "SUPER_ADMIN" && requestedCc
+    ? requestedCc.trim().toUpperCase()
+    : user?.control_center_code || localStorage.getItem(CC_KEY) || "CC-VINA";
   const storedAuto = localStorage.getItem("sos_dashboard_auto_refresh");
   if (storedAuto !== null) $("autoRefreshSelect").value = storedAuto;
   const storedHeatMode = localStorage.getItem("sos_dashboard_heat_mode");
