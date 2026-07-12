@@ -22,6 +22,7 @@ let heatBounds = null;
 let heatUserMoved = false;
 let ticketsPage = 1;
 let ticketsPagination = null;
+let openedTicketFromUrl = false;
 const charts = {};
 
 const $ = (id) => document.getElementById(id);
@@ -317,6 +318,11 @@ async function loadDashboard(options = {}) {
     currentData = data;
     renderDashboard(data);
     await Promise.all([loadTicketsPage(1, { silent: true }), loadQrAnalytics(days)]);
+    const requestedTicket = new URLSearchParams(location.search).get("ticket");
+    if (!openedTicketFromUrl && /^[0-9a-f-]{36}$/i.test(requestedTicket || "")) {
+      openedTicketFromUrl = true;
+      await openTicketDetail(requestedTicket);
+    }
     scheduleNextRefresh();
     updateLiveStatus();
   } catch (error) {
