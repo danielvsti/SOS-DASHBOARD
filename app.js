@@ -137,6 +137,7 @@ const labelMap = {
   CANCELLED: "Cancelado",
   MOBILE_APP: "PWA Vecino",
   GPS_DEVICE: "Botón físico",
+  PHONE_CALL: "Llamada municipal",
   SOS_GENERAL: "SOS general",
   SOS_DEVICE: "SOS físico",
   MEDICAL: "Médica",
@@ -191,7 +192,7 @@ function badge(value) {
   if (["VALIDATED", "AVAILABLE", "ONLINE", "RESOLVED", "CLOSED"].includes(v)) cls = "green";
   if (["PROVISIONAL_ACTIVE", "ASSIGNED", "EN_ROUTE", "ON_SITE", "DESACTUALIZADO"].includes(v)) cls = "amber";
   if (["REJECTED", "CANCELLED", "OFFLINE"].includes(v)) cls = "red";
-  if (["ACTIVE", "MOBILE_APP", "GPS_DEVICE"].includes(v)) cls = "blue";
+  if (["ACTIVE", "MOBILE_APP", "GPS_DEVICE", "PHONE_CALL"].includes(v)) cls = "blue";
   return `<span class="badge ${cls}">${label}</span>`;
 }
 
@@ -998,6 +999,7 @@ async function openTicketDetail(ticketId) {
     const data = await api(`/tickets/${encodeURIComponent(ticketId)}`); const t = data.ticket || {};
     $("ticketDetailTitle").textContent = `${shortId(t.id)} · ${t.title || niceLabel(t.alert_type)}`;
     const actions = data.actions || []; const reports = data.reports || []; const voices = data.voice_sessions || [];
+    const intake = data.manual_intake || {};
     const actionHtml = actions.map(action => `<div class="ticket-timeline-item"><strong>${escapeHtml(niceLabel(action.action_type))}</strong><div>${escapeHtml(action.description || "")}</div><small>${escapeHtml(action.actor_name || action.actor_role || "Sistema")} · ${date(action.created_at)}</small>${detailMedia(action)}</div>`).join("");
     const voiceHtml = voices.map(voice => `<div class="ticket-timeline-item"><strong>Llamada ${escapeHtml(voice.status || "")}</strong><div>${escapeHtml(voice.requested_by || "")} → ${escapeHtml(voice.target_type || "")}${voice.duration_seconds ? ` · ${voice.duration_seconds}s` : ""}</div>${voice.recording_url ? `<audio class="ticket-media" controls playsinline preload="metadata" src="${escapeHtml(voice.recording_url)}"></audio>` : '<small>Sin grabación disponible</small>'}</div>`).join("");
     content.innerHTML = `<div class="ticket-detail-grid">
@@ -1007,6 +1009,7 @@ async function openTicketDetail(ticketId) {
       <div class="ticket-detail-card"><div class="detail-label">Vecino</div><div class="detail-value">${escapeHtml(t.citizen_name || "—")}<br>${escapeHtml(t.citizen_phone || "")}</div></div>
       <div class="ticket-detail-card"><div class="detail-label">Resolutor</div><div class="detail-value">${escapeHtml(t.resolver_name || "Sin asignar")}<br>${escapeHtml(t.resolver_phone || "")}</div></div>
       <div class="ticket-detail-card"><div class="detail-label">Ubicación del evento</div><div class="detail-value">${escapeHtml(t.incident_sector_name || t.declared_address || "—")}<br><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${Number(t.latitude)},${Number(t.longitude)}">Ver en mapa</a></div></div>
+      ${t.source_type === "PHONE_CALL" ? `<div class="ticket-detail-card wide"><div class="detail-label">Ingreso telefónico municipal</div><div class="detail-value">${escapeHtml(intake.caller_name || "Persona no identificada")} · ${escapeHtml(intake.caller_phone || "Sin teléfono")}</div><div>${escapeHtml(intake.reported_address || "Dirección no informada")}</div></div>` : ""}
       ${t.qr_code ? `<div class="ticket-detail-card wide qr-attribution"><div class="detail-label">Origen QR identificado</div><div class="detail-value">${escapeHtml(t.qr_point_name)} · ${escapeHtml(t.qr_code)}</div><div>El SOS fue enviado desde el GPS real del teléfono; el QR sólo identifica el punto de acceso.</div></div>` : ""}
       <div class="ticket-detail-card wide"><h3>Historial operacional</h3><div class="ticket-timeline">${actionHtml || "Sin acciones registradas"}</div></div>
       <div class="ticket-detail-card wide"><h3>Llamadas y grabaciones</h3><div class="ticket-timeline">${voiceHtml || "No hubo sesiones de llamada"}</div></div>
@@ -1068,8 +1071,12 @@ function logout(reload = true) {
   sessionStorage.removeItem(USER_KEY);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  if (reload) location.reload();
-  else showLogin();
+  if (reload && window.opener) {
+    window.close();
+    setTimeout(showLogin, 100);
+    return;
+  }
+  showLogin();
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
