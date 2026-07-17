@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
-  <title>SOS Municipal · Dashboard Ejecutivo</title>
+  <meta name="theme-color" content="#151A1D" />
+  <title>QUELTU · Dashboard Ejecutivo</title>
+  <link rel="icon" href="queltu-symbol.png" type="image/png" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="styles.css?v=20260711-sprint0-2" />
+  <link rel="stylesheet" href="queltu-brand.css?v=20260716-2" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
@@ -16,9 +18,9 @@
   <div id="loginView" class="login-wrap">
     <section class="login-card">
       <div class="brand-row">
-        <div class="brand-mark">SOS</div>
+        <img src="queltu-symbol.png" class="brand-mark queltu-mark" alt="QUELTU" />
         <div>
-          <div class="eyebrow">Sistema SOS Municipal</div>
+          <div class="eyebrow">QUELTU · Inteligencia operacional</div>
           <h1>Dashboard Ejecutivo</h1>
         </div>
       </div>
@@ -35,10 +37,13 @@
 
   <main id="appView" class="app hidden">
     <header class="topbar">
-      <div>
-        <div class="eyebrow">Dashboard Ejecutivo</div>
-        <h1>Sistema SOS Municipal</h1>
-        <p id="subtitle" class="subtitle">Cargando indicadores...</p>
+      <div class="queltu-heading">
+        <img src="queltu-symbol.png" class="topbar-brand-mark" alt="QUELTU" />
+        <div>
+          <div class="eyebrow">QUELTU · Dashboard Ejecutivo</div>
+          <h1>Inteligencia operacional</h1>
+          <p id="subtitle" class="subtitle">Cargando indicadores...</p>
+        </div>
       </div>
       <div class="top-actions">
         <select id="periodSelect" class="select" title="Período">
@@ -310,7 +315,7 @@
     </div>
 
     <footer class="footer">
-      <span>VSTI · Sistema SOS Municipal</span>
+      <span>QUELTU · Un producto de VS&amp;TI</span>
       <span>Dashboard preparado para operación, seguimiento y presentación comercial.</span>
     </footer>
   </main>

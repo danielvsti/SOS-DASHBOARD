@@ -1,0 +1,97 @@
+:root {
+  --queltu-ink: #151a1d;
+  --queltu-ink-soft: #293138;
+  --queltu-red: #d94742;
+  --queltu-red-dark: #a91f28;
+  --queltu-coral: #f07a69;
+  --queltu-sage: #a8ad94;
+  --queltu-paper: #f4f5f8;
+  --dark: var(--queltu-ink);
+  --blue: var(--queltu-red);
+  --soft: #fff1ef;
+  --bg: var(--queltu-paper);
+}
+
+body {
+  background:
+    radial-gradient(circle at 7% 0, rgba(240, 122, 105, .15), transparent 30rem),
+    radial-gradient(circle at 96% 8%, rgba(168, 173, 148, .14), transparent 34rem),
+    var(--queltu-paper);
+}
+
+.eyebrow { color: var(--queltu-red); }
+.brand-mark.queltu-mark,
+.topbar-brand-mark {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 20px;
+  background: #fff;
+  object-fit: contain;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
+}
+.brand-mark.queltu-mark { background-image: none; }
+.queltu-heading { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.queltu-heading h1 { margin: 1px 0 0; color: #fff; }
+.queltu-heading .eyebrow { color: #ffb1a7; }
+
+.login-card {
+  border-top: 5px solid var(--queltu-red);
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 30px 80px rgba(21, 26, 29, .18);
+}
+.login-card .brand-mark.queltu-mark { box-shadow: 0 12px 30px rgba(21, 26, 29, .15); }
+.input:focus, .select:focus, .cc-input:focus {
+  border-color: var(--queltu-red);
+  box-shadow: 0 0 0 5px rgba(217, 71, 66, .13);
+}
+
+.topbar {
+  border-color: rgba(255,255,255,.10);
+  border-bottom: 3px solid var(--queltu-red);
+  background: linear-gradient(135deg, #111518 0%, var(--queltu-ink) 48%, var(--queltu-ink-soft) 100%);
+  box-shadow: 0 20px 55px rgba(21, 26, 29, .20);
+}
+.topbar .subtitle { color: #cfd6da; }
+.topbar .select,
+.topbar .cc-input {
+  border-color: rgba(255,255,255,.22);
+  background: rgba(255,255,255,.96);
+}
+
+.btn {
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn.primary {
+  border: 1px solid rgba(145, 25, 34, .24);
+  background: linear-gradient(180deg, #ef5650 0%, var(--queltu-red) 50%, #b92831 100%);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(217, 71, 66, .28), inset 0 1px rgba(255,255,255,.25);
+}
+.btn.primary:hover { background: linear-gradient(180deg, #f26059 0%, #d94742 45%, #a91f28 100%); }
+.btn.secondary {
+  background: linear-gradient(180deg, #fff 0%, #eef1f4 100%);
+  border-color: #d7dde3;
+  box-shadow: 0 7px 16px rgba(21, 26, 29, .08);
+}
+.btn.ghost { background: #30383e; color: #fff; }
+
+.hero-card, .kpi, .panel {
+  border-color: #dfe3e6;
+  box-shadow: 0 16px 44px rgba(21, 26, 29, .08);
+}
+.hero-card.dark { background: linear-gradient(145deg, #111518, #303940); }
+.hero-card.alert { background: linear-gradient(145deg, #fff2ef, #fff); border-color: #f6c9c3; }
+.status-strip { color: #606b73; }
+.footer { border-top: 1px solid #dde2e5; }
+
+@media (max-width: 760px) {
+  .brand-mark.queltu-mark, .topbar-brand-mark { width: 54px; height: 54px; border-radius: 16px; }
+  .queltu-heading { gap: 11px; }
+  .topbar { border-radius: 24px; }
+  .topbar .top-actions { width: 100%; justify-content: flex-start; }
+  .topbar .top-actions > * { flex: 1 1 145px; }
+}
